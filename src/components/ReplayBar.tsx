@@ -18,10 +18,18 @@ function elapsed(ms: number): string {
 }
 
 export function ReplayBar({ replay, currentLap }: Props) {
-  const { tMin, tMax, tNow, playing, speed } = replay
+  const { tMin, tMax, tNow, playing, speed, lapMarkers } = replay
   const dur = tMax - tMin || 1
   const pct = ((tNow - tMin) / dur) * 100
   const atEnd = tNow >= tMax - 250
+
+  // Show every lap as a notch; label majors so a long race stays legible.
+  const majorEvery = lapMarkers.length > 40 ? 10 : 5
+  const jumpToLap = (lap: number) => {
+    const m = lapMarkers.find((x) => x.lap === lap)
+    if (m) replay.seek(m.t)
+  }
+  const cur = currentLap ?? 0
 
   return (
     <div className="panel replaybar">
@@ -29,14 +37,40 @@ export function ReplayBar({ replay, currentLap }: Props) {
         {playing ? '❚❚' : atEnd ? '↺' : '▶'}
       </button>
 
-      <div className="replay-lap">
-        <span className="kicker">Lap</span>
-        <span className="mono val">{currentLap ?? '—'}</span>
+      <div className="replay-lapnav">
+        <button onClick={() => jumpToLap(cur - 1)} disabled={cur <= 1} aria-label="Previous lap">
+          ‹
+        </button>
+        <div className="replay-lap">
+          <span className="kicker">Lap</span>
+          <span className="mono val">{currentLap ?? '—'}</span>
+        </div>
+        <button onClick={() => jumpToLap(cur + 1)} aria-label="Next lap">
+          ›
+        </button>
       </div>
 
       <div className="replay-scrub">
         <span className="mono time">{clock(tNow)}</span>
         <div className="scrub-wrap">
+          <div className="lap-ticks">
+            {lapMarkers.map((m) => {
+              const left = ((m.t - tMin) / dur) * 100
+              if (left < 0 || left > 100) return null
+              const major = m.lap % majorEvery === 0 || m.lap === 1
+              return (
+                <button
+                  key={m.lap}
+                  className={`lap-tick ${major ? 'major' : ''} ${m.lap === cur ? 'now' : ''}`}
+                  style={{ left: `${left}%` }}
+                  title={`Jump to lap ${m.lap}`}
+                  onClick={() => replay.seek(m.t)}
+                >
+                  {major && <span className="lap-num">{m.lap}</span>}
+                </button>
+              )
+            })}
+          </div>
           <input
             className="scrub"
             type="range"
@@ -48,7 +82,9 @@ export function ReplayBar({ replay, currentLap }: Props) {
             style={{ ['--pct' as string]: `${pct}%` }}
           />
         </div>
-        <span className="mono time total">{elapsed(tNow - tMin)} / {elapsed(dur)}</span>
+        <span className="mono time total">
+          {elapsed(tNow - tMin)} / {elapsed(dur)}
+        </span>
       </div>
 
       <div className="seg replay-speeds">

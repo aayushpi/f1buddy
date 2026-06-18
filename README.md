@@ -67,9 +67,11 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
   data. Great for trying the UI when no race is on (≈4 real seconds per lap).
 - **Replay** — pick any historical race from the **Sessions** dropdown (year →
   Grand Prix → session). The app loads the whole session and plays it through a
-  virtual clock with **play/pause, 1–12× speed and a scrubber**; every view
-  (timing, map, telemetry, strategy, race control, weather) reflects the exact
-  state at that moment. High-frequency `car_data`/`location` are streamed in a
+  virtual clock with **play/pause, 1–12× speed, a scrubber with per-lap markers
+  you can tap to jump, and ‹ › lap-step buttons**; every view (timing, map,
+  telemetry, strategy, race control, weather) reflects the exact state at that
+  moment. The clock is anchored to the racing feeds (not the pre-race
+  weather/race-control records), and `car_data`/`location` are streamed in a
   window around the clock so the map and telemetry stay light.
 - **Live (latest)** — set the session to `latest` to poll whatever is currently
   running. Order/gaps refresh ~4.5 s, laps/stints/flags ~12 s.

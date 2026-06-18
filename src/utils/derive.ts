@@ -57,29 +57,58 @@ export const TELEMETRY_TRACE_LEN = 70
 
 const t = (iso: string | null | undefined) => (iso ? Date.parse(iso) : NaN)
 
-/** Earliest and latest record timestamps across the bulk data (ms epoch). */
+// Cached epoch on each record so the replay hot-path avoids re-parsing dates.
+type Timed = { __t?: number }
+const recT = (r: { date: string } & Timed) => (r.__t ??= Date.parse(r.date))
+const lapT = (l: { date_start: string | null } & Timed) =>
+  (l.__t ??= l.date_start ? Date.parse(l.date_start) : NaN)
+
+/** Parse and cache timestamps once after a bulk load (and after telemetry refetches). */
+export function indexRawTimes(raw: RawData): void {
+  const idx = (arr: ({ date: string } & Timed)[]) => {
+    for (const r of arr) r.__t = Date.parse(r.date)
+  }
+  idx(raw.intervals); idx(raw.positions); idx(raw.pits); idx(raw.raceControl)
+  idx(raw.weather); idx(raw.carData); idx(raw.location); idx(raw.teamRadio); idx(raw.overtakes)
+  for (const l of raw.laps as ({ date_start: string | null } & Timed)[]) {
+    l.__t = l.date_start ? Date.parse(l.date_start) : NaN
+  }
+}
+
+/** Lap-start times (leader's crossing) for the replay scrubber markers. */
+export function buildLapMarkers(raw: RawData): { lap: number; t: number }[] {
+  const m = new Map<number, number>()
+  for (const l of raw.laps) {
+    const v = lapT(l)
+    if (Number.isFinite(v)) {
+      const cur = m.get(l.lap_number)
+      if (cur == null || v < cur) m.set(l.lap_number, v)
+    }
+  }
+  return [...m.entries()].map(([lap, ts]) => ({ lap, t: ts })).sort((a, b) => a.lap - b.lap)
+}
+
+/**
+ * Replay window. Anchored to the *racing* feeds (laps, intervals, positions),
+ * NOT weather/race-control — those start well before lights-out and would
+ * otherwise put the clock in a long pre-race dead zone with an empty tower.
+ */
 export function rawTimeBounds(raw: RawData): { min: number; max: number } {
   let min = Infinity
   let max = -Infinity
-  const scan = (arr: { date: string }[]) => {
-    for (const r of arr) {
-      const v = t(r.date)
-      if (Number.isFinite(v)) {
-        if (v < min) min = v
-        if (v > max) max = v
-      }
-    }
-  }
-  scan(raw.intervals)
-  scan(raw.positions)
-  scan(raw.raceControl)
-  scan(raw.weather)
-  for (const l of raw.laps) {
-    const v = t(l.date_start)
+  const consider = (v: number) => {
     if (Number.isFinite(v)) {
       if (v < min) min = v
       if (v > max) max = v
     }
+  }
+  for (const r of raw.intervals) consider(recT(r))
+  for (const r of raw.positions) consider(recT(r))
+  for (const l of raw.laps) consider(lapT(l))
+
+  if (!Number.isFinite(min)) {
+    for (const r of raw.raceControl) consider(recT(r))
+    for (const r of raw.weather) consider(recT(r))
   }
   if (!Number.isFinite(min)) {
     const s = t(raw.session?.date_start)
@@ -96,10 +125,11 @@ export function rawTimeBounds(raw: RawData): { min: number; max: number } {
  * race has actually ended.
  */
 export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: number): RawData {
-  const dateLte = <T extends { date: string }>(arr: T[]) => arr.filter((r) => t(r.date) <= cutoffMs)
+  const dateLte = <T extends { date: string } & Timed>(arr: T[]) =>
+    arr.filter((r) => recT(r) <= cutoffMs)
 
   const laps = raw.laps.filter((l) => {
-    const v = t(l.date_start)
+    const v = lapT(l)
     return Number.isFinite(v) && v <= cutoffMs
   })
   let currentLap = 1

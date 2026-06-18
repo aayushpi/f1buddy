@@ -906,13 +906,62 @@ button {
 }
 .replay-play:hover { background: var(--accent); color: #02121a; box-shadow: 0 0 16px var(--accent-glow); }
 
-.replay-lap { display: flex; flex-direction: column; line-height: 1; flex: 0 0 auto; min-width: 44px; }
+.replay-lapnav { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.replay-lapnav > button {
+  width: 26px; height: 26px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg-2);
+  color: var(--text-dim); font-size: 16px; line-height: 1;
+  display: grid; place-items: center;
+}
+.replay-lapnav > button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.replay-lapnav > button:disabled { opacity: 0.3; cursor: default; }
+.replay-lap { display: flex; flex-direction: column; line-height: 1; min-width: 44px; align-items: center; }
 .replay-lap .val { font-size: 18px; font-weight: 700; }
 
 .replay-scrub { flex: 1 1 auto; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .replay-scrub .time { font-size: 12px; color: var(--text-dim); flex: 0 0 auto; }
 .replay-scrub .time.total { color: var(--muted); }
-.scrub-wrap { flex: 1 1 auto; }
+
+/* Scrubber with per-lap markers above the track. */
+.scrub-wrap { flex: 1 1 auto; position: relative; padding-top: 20px; }
+.lap-ticks { position: absolute; top: 0; left: 0; right: 0; height: 20px; pointer-events: none; }
+/* Wide, transparent hit area for touch; the visible notch is drawn via ::before. */
+.lap-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.lap-tick::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--muted);
+  transition: height 0.1s ease, background 0.1s ease;
+}
+.lap-tick:hover::before { background: var(--accent); height: 11px; box-shadow: 0 0 6px var(--accent-glow); }
+.lap-tick.major::before { background: var(--text-dim); height: 9px; }
+.lap-tick.now::before { background: var(--accent); height: 12px; box-shadow: 0 0 6px var(--accent-glow); }
+.lap-tick .lap-num {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--muted);
+}
 
 .scrub {
   -webkit-appearance: none;

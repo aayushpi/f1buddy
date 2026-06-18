@@ -3,6 +3,7 @@ import './styles/global.css'
 import { Header } from './components/Header'
 import { ViewTabs } from './components/ViewTabs'
 import { ReplayBar } from './components/ReplayBar'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
@@ -217,7 +218,9 @@ export default function App() {
 
       {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
 
-      {renderView()}
+      <ErrorBoundary key={activeView} label="This view hit an error">
+        {renderView()}
+      </ErrorBoundary>
 
       <Ticker race={snapshot?.race} />
 

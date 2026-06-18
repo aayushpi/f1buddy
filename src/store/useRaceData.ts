@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpenF1Config } from '../api/openf1'
 import type { ApiDriver, ApiSession, RaceSnapshot } from '../api/types'
-import { buildSnapshot, filterRawByTime, rawTimeBounds, type RawData } from '../utils/derive'
+import {
+  buildLapMarkers,
+  buildSnapshot,
+  filterRawByTime,
+  rawTimeBounds,
+  type RawData,
+} from '../utils/derive'
 import { RaceSim } from '../data/sim'
 
 export type DataMode = 'sim' | 'live'
@@ -16,12 +22,18 @@ export interface DataOptions {
   activeView: ActiveView
 }
 
+export interface LapMarker {
+  lap: number
+  t: number
+}
+
 export interface ReplayControls {
   tMin: number
   tMax: number
   tNow: number
   playing: boolean
   speed: number
+  lapMarkers: LapMarker[]
   toggle: () => void
   setSpeed: (n: number) => void
   seek: (ms: number) => void
@@ -82,6 +94,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   // Replay clock + bookkeeping shared with the playback loop.
   const clock = useRef({ tNow: 0, tMin: 0, tMax: 1, raceEnd: 1, playing: true, speed: 6 })
   const dirty = useRef(false) // force a rebuild on the next tick (after a seek)
+  const markersRef = useRef<LapMarker[]>([])
 
   useEffect(() => {
     if (rawRef.current.drivers.length && mode !== 'live') {
@@ -92,7 +105,14 @@ export function useRaceData(opts: DataOptions): DataResult {
   // ---- Replay controls (stable) ----
   const syncClock = useCallback(() => {
     const c = clock.current
-    setReplayState({ tMin: c.tMin, tMax: c.tMax, tNow: c.tNow, playing: c.playing, speed: c.speed })
+    setReplayState({
+      tMin: c.tMin,
+      tMax: c.tMax,
+      tNow: c.tNow,
+      playing: c.playing,
+      speed: c.speed,
+      lapMarkers: markersRef.current,
+    })
   }, [])
 
   const toggle = useCallback(() => {
@@ -275,6 +295,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     let winTo = -Infinity
     let fetchingTele = false
     let lastBuilt = -1
+    let lastBuildWall = 0
 
     const ensureTelemetry = (key: number) => {
       if (!TELEMETRY_VIEWS.includes(viewRef.current) || fetchingTele) return
@@ -306,6 +327,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       setSnapshot(buildSnapshot(filtered, lapWindowRef.current))
       setLastUpdated(Date.now())
       lastBuilt = c.tNow
+      lastBuildWall = Date.now()
     }
 
     let clockId: ReturnType<typeof setInterval>
@@ -351,6 +373,7 @@ export function useRaceData(opts: DataOptions): DataResult {
         // session statically rather than a frozen empty screen.
         const hasTimeline = bounds.max > bounds.min + 1000
         const raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
+        markersRef.current = buildLapMarkers(r)
         clock.current = {
           tMin: bounds.min,
           tMax: bounds.max,
@@ -368,15 +391,17 @@ export function useRaceData(opts: DataOptions): DataResult {
           const c = clock.current
           if (c.playing) {
             c.tNow = Math.min(c.tMax, c.tNow + CLOCK_INTERVAL * c.speed)
-            if (c.tNow >= c.tMax) {
-              c.playing = false
-            }
+            if (c.tNow >= c.tMax) c.playing = false
             syncClock()
           }
           ensureTelemetry(sessionKey)
-          if (c.playing || dirty.current) {
+          // Rebuild immediately after a seek; otherwise throttle the heavy
+          // filter+rebuild to ~3/s so playback stays smooth on tablets.
+          if (dirty.current) {
             dirty.current = false
-            if (c.tNow !== lastBuilt) build()
+            build()
+          } else if (c.playing && c.tNow !== lastBuilt && Date.now() - lastBuildWall >= 320) {
+            build()
           }
         }, CLOCK_INTERVAL)
       } catch (e) {
