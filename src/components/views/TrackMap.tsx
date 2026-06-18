@@ -98,9 +98,9 @@ export function TrackMap({ cars, showOutline }: Props) {
         </svg>
         {!cars.length && (
           <div className="map-empty">
-            No live positional data available for this session.
+            Loading car positions…
             <br />
-            Track positions stream from OpenF1's <b>location</b> feed.
+            Track positions stream from OpenF1's free <b>location</b> feed.
           </div>
         )}
       </div>

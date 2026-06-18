@@ -53,23 +53,26 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
 `car_data`, `location`, `team_radio`, `overtakes`, `starting_grid` and
 `session_result`.
 
-- **Historical data (2023+) is free** and needs no key.
-- **True real-time timing requires a paid OpenF1 subscription.** Add your key in
-  **Settings → API Key** and it is sent as a `Bearer` token. You can also point
-  the base URL at your own authenticated proxy.
+- **All historical data (2023+) is free and needs no key** — including
+  `car_data` telemetry and `location` track positions. Replaying any past race
+  costs nothing.
+- **Only the live, real-time stream requires a paid OpenF1 subscription.** Add
+  your key in **Settings → API Key** (sent as a `Bearer` token) to drive the
+  Live mode off an in-progress session with minimal delay.
 
 ### Modes
 
 - **Demo** *(default)* — a fully offline race simulator that produces
   OpenF1-shaped data and runs through the exact same rendering pipeline as live
   data. Great for trying the UI when no race is on (≈4 real seconds per lap).
-- **Live** — polls a real session. Use the **Sessions** dropdown in the header
-  to browse historical races (pick a year → Grand Prix → session, fetched from
-  OpenF1's `meetings`/`sessions` endpoints), set the session to `latest` for
-  whatever is currently running, or paste a specific `session_key` in settings.
-  Order/gaps refresh every ~4.5 s; laps/stints/flags every ~12 s. The
-  high-frequency `car_data`/`location` feeds are polled (~2 s, recent-window
-  bounded) only while the Track Map or Telemetry view is open.
+- **Replay** — pick any historical race from the **Sessions** dropdown (year →
+  Grand Prix → session). The app loads the whole session and plays it through a
+  virtual clock with **play/pause, 1–12× speed and a scrubber**; every view
+  (timing, map, telemetry, strategy, race control, weather) reflects the exact
+  state at that moment. High-frequency `car_data`/`location` are streamed in a
+  window around the clock so the map and telemetry stay light.
+- **Live (latest)** — set the session to `latest` to poll whatever is currently
+  running. Order/gaps refresh ~4.5 s, laps/stints/flags ~12 s.
 
 ## Running it
 

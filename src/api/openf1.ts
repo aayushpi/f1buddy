@@ -30,12 +30,27 @@ export const defaultConfig: OpenF1Config = {
   baseUrl: DEFAULT_BASE,
 }
 
-function buildUrl(cfg: OpenF1Config, path: string, params: Record<string, string | number>) {
-  const url = new URL(`${cfg.baseUrl.replace(/\/$/, '')}/${path}`)
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, String(v))
-  }
-  return url.toString()
+// OpenF1 uses comparison operators directly in the query string, e.g.
+// `?session_key=123&date>=2024-05-25T13:00:00`. The operator must NOT be
+// percent-encoded (URLSearchParams would turn `>` into `%3E`, which the API
+// ignores), so we build the query manually and only encode the value.
+function buildUrl(
+  cfg: OpenF1Config,
+  path: string,
+  params: Record<string, string | number>,
+  filters: string[] = [],
+) {
+  const base = `${cfg.baseUrl.replace(/\/$/, '')}/${path}`
+  const parts = Object.entries(params).map(
+    ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`,
+  )
+  parts.push(...filters)
+  return parts.length ? `${base}?${parts.join('&')}` : base
+}
+
+/** Build a raw comparison filter like `date>=2024-…` with an encoded value. */
+export function dateFilter(op: '>' | '>=' | '<' | '<=', iso: string): string {
+  return `date${op}${encodeURIComponent(iso)}`
 }
 
 async function get<T>(
@@ -43,11 +58,12 @@ async function get<T>(
   path: string,
   params: Record<string, string | number>,
   signal?: AbortSignal,
+  filters: string[] = [],
 ): Promise<T[]> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`
 
-  const res = await fetch(buildUrl(cfg, path, params), { headers, signal })
+  const res = await fetch(buildUrl(cfg, path, params, filters), { headers, signal })
   if (!res.ok) {
     throw new Error(`OpenF1 ${path} failed: ${res.status} ${res.statusText}`)
   }
@@ -97,31 +113,28 @@ export const api = {
   sessionResult: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
     get<ApiSessionResult>(cfg, 'session_result', { session_key: sessionKey }, signal),
 
-  // High-frequency feeds. A `since` ISO timestamp bounds the payload to a
-  // recent window (telemetry/location can be enormous otherwise).
+  // High-frequency feeds. A [from, to] ISO window bounds the payload, which is
+  // essential — telemetry/location for a whole session is hundreds of MB.
   carData: (
     cfg: OpenF1Config,
     sessionKey: number | 'latest',
-    since?: string,
+    from?: string,
+    to?: string,
     signal?: AbortSignal,
-  ) =>
-    get<ApiCarData>(
-      cfg,
-      'car_data',
-      since ? { session_key: sessionKey, 'date>': since } : { session_key: sessionKey },
-      signal,
-    ),
+  ) => get<ApiCarData>(cfg, 'car_data', { session_key: sessionKey }, signal, windowFilters(from, to)),
 
   location: (
     cfg: OpenF1Config,
     sessionKey: number | 'latest',
-    since?: string,
+    from?: string,
+    to?: string,
     signal?: AbortSignal,
-  ) =>
-    get<ApiLocation>(
-      cfg,
-      'location',
-      since ? { session_key: sessionKey, 'date>': since } : { session_key: sessionKey },
-      signal,
-    ),
+  ) => get<ApiLocation>(cfg, 'location', { session_key: sessionKey }, signal, windowFilters(from, to)),
+}
+
+function windowFilters(from?: string, to?: string): string[] {
+  const f: string[] = []
+  if (from) f.push(dateFilter('>=', from))
+  if (to) f.push(dateFilter('<=', to))
+  return f
 }

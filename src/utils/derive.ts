@@ -55,6 +55,79 @@ export interface RawData {
 
 export const TELEMETRY_TRACE_LEN = 70
 
+const t = (iso: string | null | undefined) => (iso ? Date.parse(iso) : NaN)
+
+/** Earliest and latest record timestamps across the bulk data (ms epoch). */
+export function rawTimeBounds(raw: RawData): { min: number; max: number } {
+  let min = Infinity
+  let max = -Infinity
+  const scan = (arr: { date: string }[]) => {
+    for (const r of arr) {
+      const v = t(r.date)
+      if (Number.isFinite(v)) {
+        if (v < min) min = v
+        if (v > max) max = v
+      }
+    }
+  }
+  scan(raw.intervals)
+  scan(raw.positions)
+  scan(raw.raceControl)
+  scan(raw.weather)
+  for (const l of raw.laps) {
+    const v = t(l.date_start)
+    if (Number.isFinite(v)) {
+      if (v < min) min = v
+      if (v > max) max = v
+    }
+  }
+  if (!Number.isFinite(min)) {
+    const s = t(raw.session?.date_start)
+    const e = t(raw.session?.date_end)
+    return { min: Number.isFinite(s) ? s : 0, max: Number.isFinite(e) ? e : 1 }
+  }
+  return { min, max }
+}
+
+/**
+ * Return a copy of the raw data as it would have appeared at `cutoffMs` — the
+ * core of replay. Date-bearing records are kept up to the cutoff; tyre stints
+ * are limited to those already started; final results only appear once the
+ * race has actually ended.
+ */
+export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: number): RawData {
+  const dateLte = <T extends { date: string }>(arr: T[]) => arr.filter((r) => t(r.date) <= cutoffMs)
+
+  const laps = raw.laps.filter((l) => {
+    const v = t(l.date_start)
+    return Number.isFinite(v) && v <= cutoffMs
+  })
+  let currentLap = 1
+  for (const l of laps) if (l.lap_number > currentLap) currentLap = l.lap_number
+
+  const stints = raw.stints.filter((s) => s.lap_start <= currentLap)
+  const finished = cutoffMs >= raceEndMs - 500
+
+  return {
+    session: raw.session,
+    meeting: raw.meeting,
+    drivers: raw.drivers,
+    startingGrid: raw.startingGrid,
+    intervals: dateLte(raw.intervals),
+    positions: dateLte(raw.positions),
+    laps,
+    stints,
+    pits: dateLte(raw.pits),
+    raceControl: dateLte(raw.raceControl),
+    weather: dateLte(raw.weather),
+    carData: dateLte(raw.carData),
+    location: dateLte(raw.location),
+    teamRadio: dateLte(raw.teamRadio),
+    overtakes: dateLte(raw.overtakes),
+    results: finished ? raw.results : [],
+  }
+}
+
 const EPS = 0.0005
 
 function byDriver<T extends { driver_number: number }>(records: T[]): Map<number, T[]> {

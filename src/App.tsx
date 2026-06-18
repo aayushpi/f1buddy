@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './styles/global.css'
 import { Header } from './components/Header'
 import { ViewTabs } from './components/ViewTabs'
+import { ReplayBar } from './components/ReplayBar'
 import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
@@ -60,7 +61,13 @@ export default function App() {
     return Number.isFinite(n) ? n : 'latest'
   }, [settings.sessionKey])
 
-  const { snapshot, connection, error } = useRaceData({ mode, config, sessionKey, lapWindow, activeView })
+  const { snapshot, connection, error, replay } = useRaceData({
+    mode,
+    config,
+    sessionKey,
+    lapWindow,
+    activeView,
+  })
 
   useEffect(() => {
     if (selected.size === 0 && snapshot && snapshot.drivers.length) {
@@ -198,6 +205,8 @@ export default function App() {
       />
 
       <ViewTabs active={activeView} onChange={setActiveView} />
+
+      {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
 
       {renderView()}
 
