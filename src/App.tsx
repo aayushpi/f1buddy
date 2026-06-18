@@ -51,6 +51,7 @@ export default function App() {
   const [selected, setSelected] = useState<Set<number>>(new Set(initial.selected))
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
@@ -68,6 +69,7 @@ export default function App() {
     sessionKey,
     lapWindow,
     activeView,
+    reloadNonce,
   })
 
   useEffect(() => {
@@ -112,7 +114,12 @@ export default function App() {
                 <div className="big">Could not load this session</div>
                 <div style={{ maxWidth: 480, lineHeight: 1.5 }}>{error}</div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button className="es-btn primary" onClick={() => setMode('sim')}>Use Demo instead</button>
+                  <button className="es-btn primary" onClick={() => setReloadNonce((n) => n + 1)}>
+                    Retry
+                  </button>
+                  <button className="es-btn ghost" onClick={() => setMode('sim')}>
+                    Use Demo instead
+                  </button>
                 </div>
               </>
             ) : (

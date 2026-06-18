@@ -53,6 +53,43 @@ export function dateFilter(op: '>' | '>=' | '<' | '<=', iso: string): string {
   return `date${op}${encodeURIComponent(iso)}`
 }
 
+// ---- Request scheduler ---------------------------------------------------
+// OpenF1's free tier rate-limits requests, and loading a session fires ~13 at
+// once. We funnel every request through a small queue that caps concurrency
+// and spaces requests out, then retry on 429 with backoff (honoring
+// Retry-After). This turns a burst into a steady trickle the API accepts.
+const MAX_CONCURRENT = 2
+const MIN_GAP_MS = 180
+const MAX_RETRIES = 5
+
+let active = 0
+let lastStart = 0
+const waiters: Array<() => void> = []
+
+function pump() {
+  if (active >= MAX_CONCURRENT || waiters.length === 0) return
+  const now = Date.now()
+  const wait = Math.max(0, MIN_GAP_MS - (now - lastStart))
+  active++
+  lastStart = now + wait
+  const run = waiters.shift()!
+  setTimeout(run, wait)
+}
+
+function acquire(): Promise<void> {
+  return new Promise((resolve) => {
+    waiters.push(resolve)
+    pump()
+  })
+}
+
+function release() {
+  active--
+  pump()
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 async function get<T>(
   cfg: OpenF1Config,
   path: string,
@@ -62,12 +99,35 @@ async function get<T>(
 ): Promise<T[]> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (cfg.apiKey) headers.Authorization = `Bearer ${cfg.apiKey}`
+  const url = buildUrl(cfg, path, params, filters)
 
-  const res = await fetch(buildUrl(cfg, path, params, filters), { headers, signal })
-  if (!res.ok) {
-    throw new Error(`OpenF1 ${path} failed: ${res.status} ${res.statusText}`)
+  await acquire()
+  try {
+    for (let attempt = 0; ; attempt++) {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+      const res = await fetch(url, { headers, signal })
+
+      if (res.status === 429 && attempt < MAX_RETRIES) {
+        const retryAfter = Number(res.headers.get('Retry-After'))
+        const backoff = Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : Math.min(8000, 700 * 2 ** attempt) + Math.random() * 250
+        await sleep(backoff)
+        continue
+      }
+      if (res.status === 429) {
+        throw new Error(
+          `OpenF1 rate limit (429): too many requests. Wait a few seconds and retry${
+            cfg.apiKey ? '' : ', or add an API key in Settings'
+          }.`,
+        )
+      }
+      if (!res.ok) throw new Error(`OpenF1 ${path} failed: ${res.status} ${res.statusText}`)
+      return (await res.json()) as T[]
+    }
+  } finally {
+    release()
   }
-  return (await res.json()) as T[]
 }
 
 export const api = {

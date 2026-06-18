@@ -20,6 +20,7 @@ export interface DataOptions {
   sessionKey: number | 'latest'
   lapWindow: number
   activeView: ActiveView
+  reloadNonce: number
 }
 
 export interface LapMarker {
@@ -77,7 +78,7 @@ const emptyRaw = (): RawData => ({
 const TELEMETRY_VIEWS: ActiveView[] = ['map', 'telemetry']
 
 export function useRaceData(opts: DataOptions): DataResult {
-  const { mode, config, sessionKey, lapWindow, activeView } = opts
+  const { mode, config, sessionKey, lapWindow, activeView, reloadNonce } = opts
 
   const [snapshot, setSnapshot] = useState<RaceSnapshot | null>(null)
   const [connection, setConnection] = useState<Connection>('idle')
@@ -275,7 +276,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       controller.abort()
       clearInterval(fastId); clearInterval(slowId); clearInterval(teleId)
     }
-  }, [mode, config, sessionKey])
+  }, [mode, config, sessionKey, reloadNonce])
 
   // ---- Replay mode: load a historical session and play it through time ----
   useEffect(() => {
@@ -418,7 +419,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       controller.abort()
       clearInterval(clockId)
     }
-  }, [mode, config, sessionKey, syncClock])
+  }, [mode, config, sessionKey, syncClock, reloadNonce])
 
   const replay: ReplayControls | null = replayState
     ? { ...replayState, toggle, setSpeed, seek }
