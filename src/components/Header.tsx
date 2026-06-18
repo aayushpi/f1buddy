@@ -91,7 +91,16 @@ export function Header({
 
       <div className="header-spacer" />
 
-      <SessionBrowser config={config} currentSessionKey={sessionKey} onLoad={onLoadSession} />
+      <SessionBrowser
+        config={config}
+        currentSessionKey={sessionKey}
+        activeLabel={
+          mode === 'live' && typeof sessionKey === 'number' && race
+            ? `${race.meetingName || race.circuit} · ${race.sessionName}`
+            : null
+        }
+        onLoad={onLoadSession}
+      />
 
       <div className="panel controls">
         <span className={`conn-dot conn-${connection}`} title={`Status: ${connection}`} />

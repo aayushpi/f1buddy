@@ -938,3 +938,39 @@ button {
 }
 
 .replay-speeds button { padding: 6px 9px; font-size: 10px; }
+
+/* ---- Session browser: step indicator + Race emphasis ---- */
+.sp-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 2px 2px;
+}
+.sp-steps .active { color: var(--accent); }
+.sp-steps .done { color: var(--text-dim); }
+.sp-steps .arrow { color: var(--muted); }
+
+.sp-item.session .sp-name { color: var(--text); }
+.sp-item.session.race {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: rgba(25, 227, 255, 0.07);
+}
+.sp-item.session.race .sp-name { color: var(--accent); }
+
+.es-btn.primary {
+  border: 0;
+  border-radius: 9px;
+  padding: 11px 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #02121a;
+  background: linear-gradient(120deg, var(--accent), #59f0ff);
+  box-shadow: 0 0 18px rgba(25, 227, 255, 0.3);
+}

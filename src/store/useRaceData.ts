@@ -317,21 +317,23 @@ export function useRaceData(opts: DataOptions): DataResult {
         if (!session) throw new Error('Session not found.')
         rawRef.current.session = session
 
+        // Resilient: a single failing feed shouldn't blank the whole replay.
+        const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[])
         const [drivers, meetings, intervals, positions, laps, stints, pits, rc, weather, radio, overtakes, grid, results] =
           await Promise.all([
             api.drivers(config, sessionKey, signal),
-            api.meetings(config, { meeting_key: session.meeting_key }, signal).catch(() => []),
-            api.intervals(config, sessionKey, signal),
-            api.position(config, sessionKey, signal),
-            api.laps(config, sessionKey, signal),
-            api.stints(config, sessionKey, signal),
-            api.pit(config, sessionKey, signal).catch(() => []),
-            api.raceControl(config, sessionKey, signal).catch(() => []),
-            api.weather(config, sessionKey, signal).catch(() => []),
-            api.teamRadio(config, sessionKey, signal).catch(() => []),
-            api.overtakes(config, sessionKey, signal).catch(() => []),
-            api.startingGrid(config, sessionKey, signal).catch(() => []),
-            api.sessionResult(config, sessionKey, signal).catch(() => []),
+            safe(api.meetings(config, { meeting_key: session.meeting_key }, signal)),
+            safe(api.intervals(config, sessionKey, signal)),
+            safe(api.position(config, sessionKey, signal)),
+            safe(api.laps(config, sessionKey, signal)),
+            safe(api.stints(config, sessionKey, signal)),
+            safe(api.pit(config, sessionKey, signal)),
+            safe(api.raceControl(config, sessionKey, signal)),
+            safe(api.weather(config, sessionKey, signal)),
+            safe(api.teamRadio(config, sessionKey, signal)),
+            safe(api.overtakes(config, sessionKey, signal)),
+            safe(api.startingGrid(config, sessionKey, signal)),
+            safe(api.sessionResult(config, sessionKey, signal)),
           ])
         if (cancelled) return
         const r = rawRef.current
@@ -341,16 +343,20 @@ export function useRaceData(opts: DataOptions): DataResult {
         r.pits = pits; r.raceControl = rc; r.weather = weather; r.teamRadio = radio
         r.overtakes = overtakes; r.startingGrid = grid; r.results = results
 
-        if (!r.drivers.length) throw new Error('No data for this session.')
+        if (!r.drivers.length) throw new Error('No data returned for this session.')
 
         const bounds = rawTimeBounds(r)
         const endIso = Date.parse(session.date_end)
+        // Guard against a degenerate timeline (no dated records): show the full
+        // session statically rather than a frozen empty screen.
+        const hasTimeline = bounds.max > bounds.min + 1000
+        const raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
         clock.current = {
           tMin: bounds.min,
           tMax: bounds.max,
-          raceEnd: Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max,
-          tNow: bounds.min,
-          playing: true,
+          raceEnd,
+          tNow: hasTimeline ? bounds.min : bounds.max,
+          playing: hasTimeline,
           speed: 6,
         }
         syncClock()

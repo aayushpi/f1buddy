@@ -108,17 +108,26 @@ export default function App() {
           <div className="empty-state">
             {connection === 'error' ? (
               <>
-                <div className="big">Could not reach the timing feed</div>
-                <div style={{ maxWidth: 460, lineHeight: 1.5 }}>{error}</div>
-                <div>Switch to Demo mode, or check the data source in settings.</div>
+                <div className="big">Could not load this session</div>
+                <div style={{ maxWidth: 480, lineHeight: 1.5 }}>{error}</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="es-btn primary" onClick={() => setMode('sim')}>Use Demo instead</button>
+                </div>
               </>
             ) : (
               <>
                 <div className="spinner" />
                 <div className="big">
-                  {connection === 'connecting' ? 'Connecting to the timing feed…' : 'Waiting for session data…'}
+                  {mode === 'live' && typeof sessionKey === 'number'
+                    ? 'Loading session — fetching the full race…'
+                    : connection === 'connecting'
+                      ? 'Connecting to the timing feed…'
+                      : 'Waiting for session data…'}
                 </div>
-                <div>If no race is live, switch to Demo mode to explore every feature.</div>
+                <div style={{ maxWidth: 460, lineHeight: 1.5 }}>
+                  A full race is a large download and can take a few seconds. Demo mode is the
+                  offline simulator — you don’t need it to watch real data.
+                </div>
               </>
             )}
           </div>
