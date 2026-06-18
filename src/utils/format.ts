@@ -69,6 +69,20 @@ export function compoundColor(compound: string | null | undefined): string {
   return COMPOUND_COLOR[compound.toUpperCase()] ?? '#7a8699'
 }
 
+/** "HH:MM:SS" from an ISO date string. */
+export function timeOfDay(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('en-GB', { hour12: false })
+}
+
+/** Signed places-gained string, e.g. "▲3" / "▼2" / "—". */
+export function formatPlaces(value: number | null | undefined): string {
+  if (value == null || value === 0) return '—'
+  return value > 0 ? `▲${value}` : `▼${Math.abs(value)}`
+}
+
 /** Normalise a possibly-'#'-prefixed team colour into a CSS hex string. */
 export function teamHex(colour: string | null | undefined): string {
   if (!colour) return '#8a93a6'

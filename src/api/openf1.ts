@@ -1,12 +1,19 @@
 import type {
+  ApiCarData,
   ApiDriver,
   ApiInterval,
   ApiLap,
+  ApiLocation,
+  ApiMeeting,
+  ApiOvertake,
   ApiPit,
   ApiPosition,
   ApiRaceControl,
   ApiSession,
+  ApiSessionResult,
+  ApiStartingGrid,
   ApiStint,
+  ApiTeamRadio,
   ApiWeather,
 } from './types'
 
@@ -74,4 +81,47 @@ export const api = {
 
   weather: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
     get<ApiWeather>(cfg, 'weather', { session_key: sessionKey }, signal),
+
+  meetings: (cfg: OpenF1Config, params: Record<string, string | number>, signal?: AbortSignal) =>
+    get<ApiMeeting>(cfg, 'meetings', params, signal),
+
+  teamRadio: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
+    get<ApiTeamRadio>(cfg, 'team_radio', { session_key: sessionKey }, signal),
+
+  overtakes: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
+    get<ApiOvertake>(cfg, 'overtakes', { session_key: sessionKey }, signal),
+
+  startingGrid: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
+    get<ApiStartingGrid>(cfg, 'starting_grid', { session_key: sessionKey }, signal),
+
+  sessionResult: (cfg: OpenF1Config, sessionKey: number | 'latest', signal?: AbortSignal) =>
+    get<ApiSessionResult>(cfg, 'session_result', { session_key: sessionKey }, signal),
+
+  // High-frequency feeds. A `since` ISO timestamp bounds the payload to a
+  // recent window (telemetry/location can be enormous otherwise).
+  carData: (
+    cfg: OpenF1Config,
+    sessionKey: number | 'latest',
+    since?: string,
+    signal?: AbortSignal,
+  ) =>
+    get<ApiCarData>(
+      cfg,
+      'car_data',
+      since ? { session_key: sessionKey, 'date>': since } : { session_key: sessionKey },
+      signal,
+    ),
+
+  location: (
+    cfg: OpenF1Config,
+    sessionKey: number | 'latest',
+    since?: string,
+    signal?: AbortSignal,
+  ) =>
+    get<ApiLocation>(
+      cfg,
+      'location',
+      since ? { session_key: sessionKey, 'date>': since } : { session_key: sessionKey },
+      signal,
+    ),
 }
