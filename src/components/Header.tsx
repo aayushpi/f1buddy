@@ -1,6 +1,8 @@
 import type { RaceSnapshot, TrackStatus } from '../api/types'
 import type { Connection, DataMode } from '../store/useRaceData'
+import type { OpenF1Config } from '../api/openf1'
 import { formatLapTime } from '../utils/format'
+import { SessionBrowser } from './SessionBrowser'
 
 const STATUS_LABEL: Record<TrackStatus, string> = {
   GREEN: 'Track Clear',
@@ -30,9 +32,21 @@ interface Props {
   onMode: (m: DataMode) => void
   connection: Connection
   onSettings: () => void
+  config: OpenF1Config
+  sessionKey: number | 'latest'
+  onLoadSession: (sessionKey: number) => void
 }
 
-export function Header({ snapshot, mode, onMode, connection, onSettings }: Props) {
+export function Header({
+  snapshot,
+  mode,
+  onMode,
+  connection,
+  onSettings,
+  config,
+  sessionKey,
+  onLoadSession,
+}: Props) {
   const race = snapshot?.race
   const status = race?.status ?? 'UNKNOWN'
   const pulse = status === 'YELLOW' || status === 'DOUBLE_YELLOW' || status === 'SC' || status === 'VSC'
@@ -76,6 +90,8 @@ export function Header({ snapshot, mode, onMode, connection, onSettings }: Props
       </div>
 
       <div className="header-spacer" />
+
+      <SessionBrowser config={config} currentSessionKey={sessionKey} onLoad={onLoadSession} />
 
       <div className="panel controls">
         <span className={`conn-dot conn-${connection}`} title={`Status: ${connection}`} />

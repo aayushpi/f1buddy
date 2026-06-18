@@ -791,3 +791,94 @@ button {
 .wx-trend { display: flex; flex-direction: column; padding: 12px 14px; }
 .wx-trend-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
 .wx-trend-head .mono { font-size: 16px; }
+
+/* ============================ Session browser ============================ */
+.session-browser { position: relative; }
+.session-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: all 0.18s ease;
+}
+.session-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.session-btn.open { border-color: var(--accent); color: var(--text); box-shadow: 0 0 14px rgba(25,227,255,0.2); }
+.session-btn .cal { color: var(--accent); font-size: 13px; }
+.session-btn .chev { font-size: 9px; color: var(--muted); }
+
+.session-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 560px;
+  max-width: 92vw;
+  z-index: 50;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sp-years button { padding: 5px 9px; font-size: 10px; }
+
+.sp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sp-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sp-col-title { font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding-left: 2px; }
+.sp-list {
+  height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  padding-right: 4px;
+}
+.sp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.14s ease;
+}
+.sp-item:hover { background: var(--panel-strong); border-color: var(--border); }
+.sp-item.sel {
+  border-color: var(--accent);
+  background: rgba(25, 227, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(25,227,255,0.2);
+}
+.sp-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-sub { font-size: 10.5px; color: var(--muted); }
+.sp-note { padding: 18px 10px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.sp-note.err { color: var(--amber); }
+.sp-spin { width: 22px; height: 22px; border-width: 2px; }
+
+/* Keep the header (and its Sessions dropdown) above the views below it. */
+.header { position: relative; z-index: 30; }
+.session-browser { display: flex; align-items: center; }

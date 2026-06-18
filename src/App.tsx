@@ -77,6 +77,13 @@ export default function App() {
     }
   }, [mode, settings, lapWindow, selected, activeView])
 
+  // Load a specific historical session picked from the browser: stash its key
+  // and switch to Live so the polling store replays it.
+  const loadSession = (key: number) => {
+    setSettings((s) => ({ ...s, sessionKey: String(key) }))
+    setMode('live')
+  }
+
   const toggleDriver = (n: number) =>
     setSelected((prev) => {
       const next = new Set(prev)
@@ -185,6 +192,9 @@ export default function App() {
         onMode={setMode}
         connection={connection}
         onSettings={() => setSettingsOpen(true)}
+        config={config}
+        sessionKey={sessionKey}
+        onLoadSession={loadSession}
       />
 
       <ViewTabs active={activeView} onChange={setActiveView} />

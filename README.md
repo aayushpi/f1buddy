@@ -63,9 +63,11 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
 - **Demo** *(default)* — a fully offline race simulator that produces
   OpenF1-shaped data and runs through the exact same rendering pipeline as live
   data. Great for trying the UI when no race is on (≈4 real seconds per lap).
-- **Live** — polls a real session. Set the session to `latest` for whatever is
-  currently running, or paste a specific OpenF1 `session_key` to replay a past
-  race. Order/gaps refresh every ~4.5 s; laps/stints/flags every ~12 s. The
+- **Live** — polls a real session. Use the **Sessions** dropdown in the header
+  to browse historical races (pick a year → Grand Prix → session, fetched from
+  OpenF1's `meetings`/`sessions` endpoints), set the session to `latest` for
+  whatever is currently running, or paste a specific `session_key` in settings.
+  Order/gaps refresh every ~4.5 s; laps/stints/flags every ~12 s. The
   high-frequency `car_data`/`location` feeds are polled (~2 s, recent-window
   bounded) only while the Track Map or Telemetry view is open.
 
