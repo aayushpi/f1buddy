@@ -11,7 +11,17 @@ function lapClass(d: DriverState): string {
   return ''
 }
 
-function Row({ d, fastestDriver }: { d: DriverState; fastestDriver: number | null }) {
+function Row({
+  d,
+  fastestDriver,
+  focused,
+  onFocus,
+}: {
+  d: DriverState
+  fastestDriver: number | null
+  focused: number | null
+  onFocus: (n: number) => void
+}) {
   const team = teamHex(d.teamColour)
   const isFastLap = fastestDriver === d.driverNumber && d.lastLap != null
   const lapCls = isFastLap ? 'fastest' : lapClass(d)
@@ -22,8 +32,11 @@ function Row({ d, fastestDriver }: { d: DriverState; fastestDriver: number | nul
       layout
       layoutId={`row-${d.driverNumber}`}
       transition={{ type: 'spring', stiffness: 520, damping: 42 }}
-      className={`tower-row ${d.isLeader ? 'leader' : ''} ${d.inPit ? 'in-pit' : ''}`}
+      className={`tower-row clickable ${d.isLeader ? 'leader' : ''} ${d.inPit ? 'in-pit' : ''} ${
+        focused === d.driverNumber ? 'focused' : ''
+      }`}
       style={{ ['--team' as string]: team }}
+      onClick={() => onFocus(d.driverNumber)}
     >
       <div className="pos">{d.position ?? '–'}</div>
 
@@ -63,9 +76,13 @@ function Row({ d, fastestDriver }: { d: DriverState; fastestDriver: number | nul
 export function TimingTower({
   drivers,
   fastestDriver,
+  focused,
+  onFocus,
 }: {
   drivers: DriverState[]
   fastestDriver: number | null
+  focused: number | null
+  onFocus: (n: number) => void
 }) {
   return (
     <div className="panel tower">
@@ -89,7 +106,13 @@ export function TimingTower({
       <div className="tower-body">
         <AnimatePresence>
           {drivers.map((d) => (
-            <Row key={d.driverNumber} d={d} fastestDriver={fastestDriver} />
+            <Row
+              key={d.driverNumber}
+              d={d}
+              fastestDriver={fastestDriver}
+              focused={focused}
+              onFocus={onFocus}
+            />
           ))}
         </AnimatePresence>
       </div>

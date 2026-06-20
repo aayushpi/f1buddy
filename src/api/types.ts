@@ -201,6 +201,15 @@ export interface LapPoint {
   time: number
 }
 
+export interface LapDetail {
+  lap: number
+  time: number | null
+  s1: number | null
+  s2: number | null
+  s3: number | null
+  pitOut: boolean
+}
+
 export interface DriverState {
   driverNumber: number
   acronym: string
@@ -219,6 +228,8 @@ export interface DriverState {
   stintLaps: number | null // laps completed in the current stint
   inPit: boolean
   lapTimes: LapPoint[]
+  // Full per-lap breakdown (lap time + sectors), oldest -> newest, for analysis.
+  lapHistory: LapDetail[]
   avgLapTime: number | null
   // Extended live data.
   speedTrap: number | null // km/h at the speed-trap on the latest lap

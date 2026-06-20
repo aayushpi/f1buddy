@@ -304,6 +304,17 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     }) as [SectorState, SectorState, SectorState]
 
     const lapTimes = laps.slice(-lapWindow).map((l) => ({ lap: l.lap_number, time: l.lap_duration! }))
+    const lapHistory = allLaps
+      .slice()
+      .sort((a, b) => a.lap_number - b.lap_number)
+      .map((l) => ({
+        lap: l.lap_number,
+        time: l.lap_duration,
+        s1: l.duration_sector_1,
+        s2: l.duration_sector_2,
+        s3: l.duration_sector_3,
+        pitOut: l.is_pit_out_lap,
+      }))
     const avgLapTime = lapTimes.length
       ? lapTimes.reduce((acc, p) => acc + p.time, 0) / lapTimes.length
       : null
@@ -352,6 +363,7 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
       stintLaps,
       inPit,
       lapTimes,
+      lapHistory,
       avgLapTime,
       speedTrap: latestLapRecord?.st_speed ?? null,
       drs: decodeDrs(car?.drs),

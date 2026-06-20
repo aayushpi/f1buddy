@@ -12,7 +12,7 @@ import { RaceSim } from '../data/sim'
 
 export type DataMode = 'sim' | 'live'
 export type Connection = 'idle' | 'connecting' | 'live' | 'sim' | 'replay' | 'error'
-export type ActiveView = 'timing' | 'map' | 'telemetry' | 'strategy' | 'control' | 'weather'
+export type ActiveView = 'timing' | 'map' | 'gap' | 'telemetry' | 'strategy' | 'control' | 'weather'
 
 export interface DataOptions {
   mode: DataMode
@@ -46,6 +46,32 @@ export interface DataResult {
   error: string | null
   lastUpdated: number | null
   replay: ReplayControls | null
+  // Ordered points tracing the circuit, derived from the location feed. null in
+  // sim mode (the synthetic circuit outline is drawn from local geometry).
+  trackOutline: { x: number; y: number }[] | null
+}
+
+/**
+ * Trace a circuit outline from raw location samples. Points are ordered by time
+ * (so a single car's lap draws a clean loop), de-duplicated, and down-sampled to
+ * keep the SVG path light.
+ */
+function buildOutline(locs: { x: number; y: number; date: string }[]): { x: number; y: number }[] {
+  const sorted = [...locs].sort((a, b) => (a.date < b.date ? -1 : 1))
+  const pts: { x: number; y: number }[] = []
+  let last: { x: number; y: number } | null = null
+  for (const l of sorted) {
+    if (l.x === 0 && l.y === 0) continue
+    if (last && Math.hypot(l.x - last.x, l.y - last.y) < 1) continue
+    pts.push({ x: l.x, y: l.y })
+    last = { x: l.x, y: l.y }
+  }
+  const MAX = 260
+  if (pts.length <= MAX) return pts
+  const step = pts.length / MAX
+  const out: { x: number; y: number }[] = []
+  for (let i = 0; i < MAX; i++) out.push(pts[Math.floor(i * step)])
+  return out
 }
 
 const FAST_INTERVAL = 4500
@@ -85,6 +111,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [replayState, setReplayState] = useState<Omit<ReplayControls, 'toggle' | 'setSpeed' | 'seek'> | null>(null)
+  const [trackOutline, setTrackOutline] = useState<{ x: number; y: number }[] | null>(null)
 
   const rawRef = useRef<RawData>(emptyRaw())
   const lapWindowRef = useRef(lapWindow)
@@ -147,6 +174,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   useEffect(() => {
     if (mode !== 'sim') return
     setReplayState(null)
+    setTrackOutline(null)
     const sim = new RaceSim()
     sim.reset()
     setConnection('sim')
@@ -173,6 +201,11 @@ export function useRaceData(opts: DataOptions): DataResult {
     setSnapshot(null)
     setConnection('connecting')
     setError(null)
+    setTrackOutline(null)
+
+    // Trace the circuit progressively from a single reference car's positions.
+    let outlineRef: number | null = null
+    const outlinePts: { x: number; y: number; date: string }[] = []
 
     const fail = (e: unknown) => {
       if (cancelled || signal.aborted) return
@@ -254,6 +287,13 @@ export function useRaceData(opts: DataOptions): DataResult {
         ])
         if (carData.length) rawRef.current.carData = carData
         if (location.length) rawRef.current.location = location
+        if (location.length) {
+          if (outlineRef == null) outlineRef = location[0].driver_number
+          for (const l of location) {
+            if (l.driver_number === outlineRef) outlinePts.push({ x: l.x, y: l.y, date: l.date })
+          }
+          if (outlinePts.length > 40) setTrackOutline(buildOutline(outlinePts))
+        }
         rebuild()
       } catch {
         /* best effort */
@@ -290,6 +330,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     setConnection('connecting')
     setError(null)
     setReplayState(null)
+    setTrackOutline(null)
 
     // Telemetry window cache.
     let winFrom = Infinity
@@ -388,6 +429,31 @@ export function useRaceData(opts: DataOptions): DataResult {
         build()
         ensureTelemetry(sessionKey)
 
+        // One-shot circuit outline: trace ~2.5 min of the winner's location
+        // (a car guaranteed to have run a full lap) right after the start.
+        const refDriver =
+          results.find((x) => x.position === 1)?.driver_number ?? r.drivers[0]?.driver_number
+        // Anchor the window to an early-but-green-flag lap of the reference car.
+        // Anchoring to bounds.min lands in the pre-race/grid period where the
+        // location feed reports (0,0) for every car.
+        const refLaps = r.laps
+          .filter((l) => l.driver_number === refDriver && l.date_start)
+          .sort((a, b) => a.lap_number - b.lap_number)
+        const anchorLap = refLaps.find((l) => l.lap_number >= 5) ?? refLaps[0]
+        const anchor = anchorLap ? Date.parse(anchorLap.date_start!) : bounds.min
+        if (refDriver != null && Number.isFinite(anchor)) {
+          const oFrom = new Date(anchor).toISOString()
+          const oTo = new Date(Math.min(bounds.max, anchor + 160000)).toISOString()
+          api
+            .location(config, sessionKey, oFrom, oTo, signal)
+            .then((locs) => {
+              const ref = locs.filter((l) => l.driver_number === refDriver)
+              const pts = buildOutline(ref.length > 30 ? ref : locs)
+              if (!cancelled && !signal.aborted && pts.length > 20) setTrackOutline(pts)
+            })
+            .catch(() => {})
+        }
+
         clockId = setInterval(() => {
           const c = clock.current
           if (c.playing) {
@@ -425,7 +491,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     ? { ...replayState, toggle, setSpeed, seek }
     : null
 
-  return { snapshot, connection, error, lastUpdated, replay }
+  return { snapshot, connection, error, lastUpdated, replay, trackOutline }
 }
 
 export { SPEEDS }

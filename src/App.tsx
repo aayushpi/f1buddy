@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
 import './styles/global.css'
 import { Header } from './components/Header'
 import { ViewTabs } from './components/ViewTabs'
@@ -7,8 +8,12 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
+import { RadioPopover } from './components/RadioPopover'
+import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
+import type { RadioClip } from './api/types'
 import { TrackMap } from './components/views/TrackMap'
+import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
 import { RaceControlView } from './components/views/RaceControlView'
@@ -52,6 +57,9 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
+  const [activeRadio, setActiveRadio] = useState<RadioClip | null>(null)
+  const lastRadioDate = useRef<string>('')
+  const [focusDriver, setFocusDriver] = useState<number | null>(null)
 
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
@@ -63,7 +71,7 @@ export default function App() {
     return Number.isFinite(n) ? n : 'latest'
   }, [settings.sessionKey])
 
-  const { snapshot, connection, error, replay } = useRaceData({
+  const { snapshot, connection, error, replay, trackOutline } = useRaceData({
     mode,
     config,
     sessionKey,
@@ -77,6 +85,24 @@ export default function App() {
       setSelected(new Set(snapshot.drivers.slice(0, 3).map((d) => d.driverNumber)))
     }
   }, [snapshot, selected.size])
+
+  // Reset radio tracking when the session changes so the popover doesn't carry
+  // a stale clip across races.
+  useEffect(() => {
+    lastRadioDate.current = ''
+    setActiveRadio(null)
+  }, [mode, sessionKey])
+
+  // Surface each newly-arrived team-radio clip as a popover (newest first).
+  useEffect(() => {
+    const radios = snapshot?.radios
+    if (!radios?.length) return
+    const newest = radios[0]
+    if (newest.date > lastRadioDate.current) {
+      lastRadioDate.current = newest.date
+      setActiveRadio(newest)
+    }
+  }, [snapshot?.radios])
 
   useEffect(() => {
     const data: Persisted = { mode, settings, lapWindow, selected: [...selected], activeView }
@@ -93,6 +119,8 @@ export default function App() {
     setSettings((s) => ({ ...s, sessionKey: String(key) }))
     setMode('live')
   }
+
+  const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
   const toggleDriver = (n: number) =>
     setSelected((prev) => {
@@ -146,9 +174,14 @@ export default function App() {
     switch (activeView) {
       case 'timing':
         return (
-          <div className="body">
+          <div className={`body ${focusDriver != null ? 'with-focus' : ''}`}>
             <div className="col">
-              <TimingTower drivers={snapshot.drivers} fastestDriver={snapshot.fastestLap?.driverNumber ?? null} />
+              <TimingTower
+                drivers={snapshot.drivers}
+                fastestDriver={snapshot.fastestLap?.driverNumber ?? null}
+                focused={focusDriver}
+                onFocus={toggleFocus}
+              />
             </div>
             <div className="col">
               <LapAnalysis
@@ -159,12 +192,34 @@ export default function App() {
                 onWindow={setLapWindow}
               />
             </div>
+            <AnimatePresence>
+              {focusDriver != null && (
+                <DriverFocus
+                  key={focusDriver}
+                  drivers={snapshot.drivers}
+                  focused={focusDriver}
+                  onClose={() => setFocusDriver(null)}
+                />
+              )}
+            </AnimatePresence>
           </div>
         )
       case 'map':
         return (
           <div className="viewbody">
-            <TrackMap cars={snapshot.trackMap} showOutline={mode === 'sim'} />
+            <TrackMap cars={snapshot.trackMap} outline={trackOutline} showSimOutline={mode === 'sim'} />
+          </div>
+        )
+      case 'gap':
+        return (
+          <div className="viewbody">
+            <GapChart
+              drivers={snapshot.drivers}
+              raceControl={snapshot.raceControlLog}
+              meetingName={snapshot.race.meetingName}
+              sessionName={snapshot.race.sessionName}
+              year={snapshot.race.year}
+            />
           </div>
         )
       case 'telemetry':
@@ -230,6 +285,16 @@ export default function App() {
       </ErrorBoundary>
 
       <Ticker race={snapshot?.race} />
+
+      <AnimatePresence>
+        {activeRadio && (
+          <RadioPopover
+            key={activeRadio.date}
+            radio={activeRadio}
+            onClose={() => setActiveRadio(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <SettingsDrawer
         open={settingsOpen}
