@@ -118,7 +118,7 @@ export function SessionBrowser({ config, currentSessionKey, activeLabel, onLoad 
           transition={{ duration: 0.16 }}
         >
           <div className="sp-head">
-            <span>Replay real F1 data — no Demo needed</span>
+            <span>Replay a session</span>
             <div className="seg sp-years">
               {YEARS.map((y) => (
                 <button key={y} className={y === year ? 'active' : ''} onClick={() => setYear(y)}>
@@ -164,7 +164,7 @@ export function SessionBrowser({ config, currentSessionKey, activeLabel, onLoad 
               </div>
               <div className="sp-list">
                 {selectedMeeting == null && (
-                  <div className="sp-note">← Choose a Grand Prix, then pick a session (e.g. the Race).</div>
+                  <div className="sp-note">Choose a Grand Prix first.</div>
                 )}
                 {selectedMeeting != null && sessionsState === 'loading' && (
                   <div className="sp-note"><span className="spinner sp-spin" /></div>

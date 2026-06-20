@@ -82,9 +82,6 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
       <div className="panel-title">
         <span className="dot" />
         Car Telemetry
-        <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.1em' }}>
-          SPEED · RPM · GEAR · THROTTLE · BRAKE · DRS
-        </span>
       </div>
 
       <div className="driver-chips" style={{ maxHeight: 80 }}>
@@ -108,7 +105,7 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
           ))}
         </div>
       ) : (
-        <div className="chart-empty">Select up to four drivers to inspect live car telemetry.</div>
+        <div className="chart-empty">Select up to four drivers.</div>
       )}
     </div>
   )
