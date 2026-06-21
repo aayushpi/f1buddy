@@ -161,10 +161,6 @@ export default function App() {
                       ? 'Connecting to the timing feed…'
                       : 'Waiting for session data…'}
                 </div>
-                <div style={{ maxWidth: 460, lineHeight: 1.5 }}>
-                  A full race is a large download and can take a few seconds. Demo mode is the
-                  offline simulator — you don’t need it to watch real data.
-                </div>
               </>
             )}
           </div>

@@ -68,7 +68,7 @@ export function Header({
         </div>
       </div>
 
-      <div className="panel header-block">
+      <div className="panel header-block mobile-hide">
         <span className="kicker">Circuit</span>
         <span className="value-md">{race?.circuit ?? '—'}</span>
       </div>
@@ -80,7 +80,7 @@ export function Header({
         </span>
       </div>
 
-      <div className="panel header-block">
+      <div className="panel header-block mobile-hide">
         <span className="kicker">Fastest Lap</span>
         <span className="value-md mono" style={{ color: 'var(--purple)' }}>
           {snapshot?.fastestLap
