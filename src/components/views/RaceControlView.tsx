@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { OvertakeEvent, RaceControlEntry, RadioClip } from '../../api/types'
-import { teamHex, timeOfDay } from '../../utils/format'
+import { formatRaceMessage, teamHex, timeOfDay } from '../../utils/format'
 
 interface Props {
   log: RaceControlEntry[]
@@ -59,7 +59,7 @@ export function RaceControlView({ log, overtakes, radios }: Props) {
                 <span className="rc-flag" />
                 <span className="mono rc-time">{timeOfDay(m.date)}</span>
                 {m.lap != null && <span className="mono rc-lap">L{m.lap}</span>}
-                <span className="rc-msg">{m.message}</span>
+                <span className="rc-msg">{formatRaceMessage(m.message)}</span>
               </div>
             ))
           ) : (

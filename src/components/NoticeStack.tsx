@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Notice } from '../hooks/useRaceNotices'
-import { formatLapTime } from '../utils/format'
+import { formatLapTime, formatRaceMessage } from '../utils/format'
 
 interface Props {
   notices: Notice[]
@@ -105,7 +105,7 @@ function NoticeCard({ notice, onDismiss }: { notice: Notice; onDismiss: (id: str
       {notice.kind === 'control' && (
         <>
           <span className="notice-kicker">Race Control</span>
-          <span className="notice-msg">{notice.message}</span>
+          <span className="notice-msg">{formatRaceMessage(notice.message)}</span>
         </>
       )}
 
