@@ -46,13 +46,12 @@ export function Header({ snapshot, connection, onSettings }: Props) {
           <span className="label">{STATUS_LABEL[status]}</span>
           <span className="sub">{STATUS_SUB[status]}</span>
         </div>
-      </div>
-
-      <div className="panel header-block">
-        <span className="kicker">{race?.sessionName ?? 'Session'}</span>
-        <span className="value-lg mono">
-          {race?.currentLap != null ? `LAP ${race.currentLap}` : '—'}
-        </span>
+        <div className="status-lap">
+          <span className="kicker">{race?.sessionName ?? 'Session'}</span>
+          <span className="value-lg mono">
+            {race?.currentLap != null ? `LAP ${race.currentLap}` : '—'}
+          </span>
+        </div>
       </div>
 
       <div className="header-spacer" />

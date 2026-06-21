@@ -228,6 +228,12 @@ button {
 .status-text { display: flex; flex-direction: column; }
 .status-text .label { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; }
 .status-text .sub { font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+/* Lap count merged into the status pill, divided off to its right. */
+.status-lap {
+  display: flex; flex-direction: column;
+  margin-left: 6px; padding-left: 16px;
+  border-left: 1px solid var(--border-strong);
+}
 
 /* Mode + settings controls */
 .controls { display: flex; align-items: center; gap: 8px; padding: 10px; }
@@ -500,18 +506,6 @@ button {
   padding: 9px 16px;
   font-size: 12px;
 }
-.ticker .tag {
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--bg-0);
-  background: var(--accent);
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-weight: 800;
-  flex: 0 0 auto;
-}
-.ticker .msg { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ticker .weather { margin-left: auto; display: flex; gap: 16px; color: var(--muted); flex: 0 0 auto; }
 .ticker .weather b { color: var(--text-dim); font-family: var(--mono); font-weight: 600; }
 
@@ -1416,8 +1410,8 @@ button {
   .replay-scrub { order: 5; flex: 1 1 100%; }
 
   /* ---- Ticker: just the message; weather lives in its own view ---- */
-  .ticker { font-size: 11px; padding: 8px 12px; }
-  .ticker .weather { display: none; }
+  /* Weather-only footer is non-essential on a phone; reclaim the space. */
+  .ticker { display: none; }
 
   /* ---- Timing: stack tower over analysis ---- */
   .body { display: flex; flex-direction: column; gap: 8px; }
