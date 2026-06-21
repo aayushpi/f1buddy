@@ -516,13 +516,15 @@ button {
 .ticker .weather b { color: var(--text-dim); font-family: var(--mono); font-weight: 600; }
 
 /* ============================ Settings drawer ============================ */
-.scrim {
+/* Scoped under .app so they beat the `.app > * { position: relative }` rule
+   below and stay true viewport overlays rather than in-flow children. */
+.app > .scrim {
   position: fixed; inset: 0;
   background: rgba(2, 4, 9, 0.6);
   backdrop-filter: blur(3px);
   z-index: 40;
 }
-.drawer {
+.app > .drawer {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: min(420px, 92vw);
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
@@ -919,6 +921,22 @@ button {
 .sp-note { padding: 18px 10px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .sp-note.err { color: var(--amber); }
 .sp-spin { width: 22px; height: 22px; border-width: 2px; }
+
+/* Inside the Settings drawer the picker flows in-place (single column) instead
+   of as a floating dropdown — a 560px two-column popover can't fit, and an
+   absolutely-positioned panel gets clipped by the drawer's scroll box. */
+.drawer .session-browser { display: block; width: 100%; }
+.drawer .session-btn { width: 100%; justify-content: center; }
+.drawer .session-pop {
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin-top: 8px;
+  box-shadow: none;
+  border-color: var(--border);
+}
+.drawer .sp-cols { grid-template-columns: 1fr; }
+.drawer .sp-list { height: 190px; }
 
 /* Keep the header (and its Sessions dropdown) above the views below it. */
 .header { position: relative; z-index: 30; }
