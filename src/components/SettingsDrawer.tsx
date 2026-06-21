@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import type { OpenF1Config } from '../api/openf1'
+import type { DataMode } from '../store/useRaceData'
+import { SessionBrowser } from './SessionBrowser'
 
 export interface AppSettings {
   baseUrl: string
@@ -12,13 +15,38 @@ interface Props {
   settings: AppSettings
   onClose: () => void
   onApply: (s: AppSettings) => void
+  // Mode + race loading live here now (out of the header chrome).
+  mode: DataMode
+  onMode: (m: DataMode) => void
+  config: OpenF1Config
+  sessionKey: number | 'latest'
+  activeLabel: string | null
+  onLoadSession: (key: number) => void
 }
 
-export function SettingsDrawer({ open, settings, onClose, onApply }: Props) {
+export function SettingsDrawer({
+  open,
+  settings,
+  onClose,
+  onApply,
+  mode,
+  onMode,
+  config,
+  sessionKey,
+  activeLabel,
+  onLoadSession,
+}: Props) {
   const [draft, setDraft] = useState<AppSettings>(settings)
   if (!open) return null
 
   const set = (patch: Partial<AppSettings>) => setDraft((d) => ({ ...d, ...patch }))
+
+  // Loading a historical race implies Live mode; close the drawer so the
+  // replay is visible immediately.
+  const loadSession = (key: number) => {
+    onLoadSession(key)
+    onClose()
+  }
 
   return (
     <>
@@ -29,6 +57,34 @@ export function SettingsDrawer({ open, settings, onClose, onApply }: Props) {
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 38 }}
       >
+        <h2>Mode</h2>
+
+        <div className="field">
+          <div className="seg drawer-seg">
+            <button className={mode === 'sim' ? 'active' : ''} onClick={() => onMode('sim')}>
+              Demo
+            </button>
+            <button className={mode === 'live' ? 'active' : ''} onClick={() => onMode('live')}>
+              Live
+            </button>
+          </div>
+          <span className="hint">
+            <b>Demo</b> runs a fully offline simulated race. <b>Live</b> connects to OpenF1 — the
+            session in progress, or a past race you load below.
+          </span>
+        </div>
+
+        <div className="field">
+          <label>Load a race</label>
+          <SessionBrowser
+            config={config}
+            currentSessionKey={sessionKey}
+            activeLabel={activeLabel}
+            onLoad={loadSession}
+          />
+          <span className="hint">Browse and replay any past Grand Prix session.</span>
+        </div>
+
         <h2>Data Source</h2>
 
         <div className="field">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import './styles/global.css'
 import { Header } from './components/Header'
@@ -8,10 +8,10 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
-import { RadioPopover } from './components/RadioPopover'
+import { NoticeStack } from './components/NoticeStack'
+import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
-import type { RadioClip } from './api/types'
 import { TrackMap } from './components/views/TrackMap'
 import { SpeedMap } from './components/views/SpeedMap'
 import { GapChart } from './components/views/GapChart'
@@ -58,8 +58,6 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
-  const [activeRadio, setActiveRadio] = useState<RadioClip | null>(null)
-  const lastRadioDate = useRef<string>('')
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
 
   const config = useMemo(
@@ -87,23 +85,9 @@ export default function App() {
     }
   }, [snapshot, selected.size])
 
-  // Reset radio tracking when the session changes so the popover doesn't carry
-  // a stale clip across races.
-  useEffect(() => {
-    lastRadioDate.current = ''
-    setActiveRadio(null)
-  }, [mode, sessionKey])
-
-  // Surface each newly-arrived team-radio clip as a popover (newest first).
-  useEffect(() => {
-    const radios = snapshot?.radios
-    if (!radios?.length) return
-    const newest = radios[0]
-    if (newest.date > lastRadioDate.current) {
-      lastRadioDate.current = newest.date
-      setActiveRadio(newest)
-    }
-  }, [snapshot?.radios])
+  // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
+  // surfaced as a stacked, auto-dismissing popover. Reset per session.
+  const { notices, dismiss } = useRaceNotices(snapshot, `${mode}:${String(sessionKey)}`)
 
   useEffect(() => {
     const data: Persisted = { mode, settings, lapWindow, selected: [...selected], activeView }
@@ -270,13 +254,8 @@ export default function App() {
 
       <Header
         snapshot={snapshot}
-        mode={mode}
-        onMode={setMode}
         connection={connection}
         onSettings={() => setSettingsOpen(true)}
-        config={config}
-        sessionKey={sessionKey}
-        onLoadSession={loadSession}
       />
 
       <ViewTabs active={activeView} onChange={setActiveView} />
@@ -289,21 +268,23 @@ export default function App() {
 
       <Ticker race={snapshot?.race} />
 
-      <AnimatePresence>
-        {activeRadio && (
-          <RadioPopover
-            key={activeRadio.date}
-            radio={activeRadio}
-            onClose={() => setActiveRadio(null)}
-          />
-        )}
-      </AnimatePresence>
+      <NoticeStack notices={notices} onDismiss={dismiss} />
 
       <SettingsDrawer
         open={settingsOpen}
         settings={settings}
         onClose={() => setSettingsOpen(false)}
         onApply={setSettings}
+        mode={mode}
+        onMode={setMode}
+        config={config}
+        sessionKey={sessionKey}
+        activeLabel={
+          mode === 'live' && typeof sessionKey === 'number' && snapshot?.race
+            ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
+            : null
+        }
+        onLoadSession={loadSession}
       />
     </div>
   )
