@@ -712,6 +712,47 @@ button {
 .tcard-trace { margin-top: auto; }
 .trace-lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 
+/* Multi-channel telemetry traces */
+.tch-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.tch { display: flex; flex-direction: column; gap: 1px; }
+.tch-lbl { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.teammate-tag { color: var(--muted); font-weight: 900; font-size: 15px; line-height: 1; }
+
+/* Speed comparison overlay */
+.speed-overlay { padding: 0 14px 6px; flex: 0 0 auto; }
+.speed-overlay .trace-lbl { display: block; margin-bottom: 4px; }
+.speed-overlay-svg { width: 100%; height: 64px; display: block; }
+.chip.teammate .swatch { background: none; border: 1.5px dashed var(--team); }
+
+/* Speed map legend + toggle */
+.sm-toggle { flex: 0 0 auto; }
+.sm-legend {
+  position: absolute;
+  left: 18px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 36px);
+  background: rgba(5, 7, 13, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  backdrop-filter: blur(6px);
+}
+.sm-l { font-family: var(--mono); color: var(--muted); }
+.sm-bar {
+  width: 150px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, hsl(240 92% 55%), hsl(180 92% 55%), hsl(120 92% 55%), hsl(60 92% 55%), hsl(0 92% 55%));
+}
+.sm-key { display: flex; align-items: center; gap: 5px; font-family: var(--mono); }
+.sm-key .sw { width: 13px; height: 8px; border-radius: 2px; }
+
 /* ============================ Strategy ============================ */
 .strategy { flex: 1 1 auto; display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; min-height: 0; }
 .strat-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }

@@ -13,6 +13,7 @@ import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
 import type { RadioClip } from './api/types'
 import { TrackMap } from './components/views/TrackMap'
+import { SpeedMap } from './components/views/SpeedMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
@@ -71,7 +72,7 @@ export default function App() {
     return Number.isFinite(n) ? n : 'latest'
   }, [settings.sessionKey])
 
-  const { snapshot, connection, error, replay, trackOutline } = useRaceData({
+  const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
     mode,
     config,
     sessionKey,
@@ -208,6 +209,12 @@ export default function App() {
         return (
           <div className="viewbody">
             <TrackMap cars={snapshot.trackMap} outline={trackOutline} showSimOutline={mode === 'sim'} />
+          </div>
+        )
+      case 'speedmap':
+        return (
+          <div className="viewbody">
+            <SpeedMap channels={trackChannels} />
           </div>
         )
       case 'gap':

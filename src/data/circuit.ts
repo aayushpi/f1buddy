@@ -2,6 +2,8 @@
 // map and to derive a realistic speed profile for telemetry. Coordinates live
 // in a roughly [-1000, 1000] space to mirror OpenF1's `location` x/y units.
 
+import type { ChannelPoint } from '../api/types'
+
 export interface Pt {
   x: number
   y: number
@@ -108,4 +110,15 @@ export const DRS_ZONES: [number, number][] = [
 export function inDrsZone(p: number): boolean {
   const pp = ((p % 1) + 1) % 1
   return DRS_ZONES.some(([a, b]) => pp >= a && pp <= b)
+}
+
+/** Circuit outline enriched with speed / gear / DRS for the demo speed map. */
+export function simChannels(): ChannelPoint[] {
+  const out: ChannelPoint[] = []
+  for (let i = 0; i < SAMPLES; i += 2) {
+    const s = TABLE.samples[i]
+    const gear = Math.max(1, Math.min(8, Math.round(s.speed / 42) + 1))
+    out.push({ x: s.p.x, y: s.p.y, speed: s.speed, gear, drs: inDrsZone(s.t) })
+  }
+  return out
 }

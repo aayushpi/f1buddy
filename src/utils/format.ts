@@ -89,3 +89,25 @@ export function teamHex(colour: string | null | undefined): string {
   const c = colour.replace(/^#/, '').trim()
   return c.length === 6 ? `#${c}` : '#8a93a6'
 }
+
+/**
+ * Teammates share a colour, so distinguish them by line style: within each
+ * team the lower car number draws solid, the other dashed. Returns a map of
+ * driverNumber → SVG stroke-dasharray ('' = solid).
+ */
+export function teamLineDash(
+  drivers: { driverNumber: number; teamName: string }[],
+): Map<number, string> {
+  const byTeam = new Map<string, number[]>()
+  for (const d of drivers) {
+    const arr = byTeam.get(d.teamName) ?? []
+    arr.push(d.driverNumber)
+    byTeam.set(d.teamName, arr)
+  }
+  const out = new Map<number, string>()
+  for (const nums of byTeam.values()) {
+    nums.sort((a, b) => a - b)
+    nums.forEach((n, i) => out.set(n, i === 0 ? '' : '7 5'))
+  }
+  return out
+}

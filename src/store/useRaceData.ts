@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpenF1Config } from '../api/openf1'
-import type { ApiDriver, ApiSession, RaceSnapshot } from '../api/types'
+import type { ApiCarData, ApiDriver, ApiLocation, ApiSession, ChannelPoint, RaceSnapshot } from '../api/types'
 import {
   buildLapMarkers,
   buildSnapshot,
@@ -9,10 +9,19 @@ import {
   type RawData,
 } from '../utils/derive'
 import { RaceSim } from '../data/sim'
+import { simChannels } from '../data/circuit'
 
 export type DataMode = 'sim' | 'live'
 export type Connection = 'idle' | 'connecting' | 'live' | 'sim' | 'replay' | 'error'
-export type ActiveView = 'timing' | 'map' | 'gap' | 'telemetry' | 'strategy' | 'control' | 'weather'
+export type ActiveView =
+  | 'timing'
+  | 'map'
+  | 'speedmap'
+  | 'gap'
+  | 'telemetry'
+  | 'strategy'
+  | 'control'
+  | 'weather'
 
 export interface DataOptions {
   mode: DataMode
@@ -49,6 +58,34 @@ export interface DataResult {
   // Ordered points tracing the circuit, derived from the location feed. null in
   // sim mode (the synthetic circuit outline is drawn from local geometry).
   trackOutline: { x: number; y: number }[] | null
+  // Circuit outline enriched with speed / gear / DRS, for painting the track.
+  trackChannels: ChannelPoint[] | null
+}
+
+/** Merge a reference car's location + car_data into a speed/gear/DRS path. */
+function buildChannels(locs: ApiLocation[], cars: ApiCarData[]): ChannelPoint[] {
+  const L = locs.filter((l) => !(l.x === 0 && l.y === 0)).sort((a, b) => (a.date < b.date ? -1 : 1))
+  const C = [...cars].sort((a, b) => (a.date < b.date ? -1 : 1))
+  if (L.length < 2 || C.length < 2) return []
+  const ct = C.map((c) => Date.parse(c.date))
+  let ci = 0
+  const raw: ChannelPoint[] = []
+  let last: ChannelPoint | null = null
+  for (const l of L) {
+    const lt = Date.parse(l.date)
+    while (ci < C.length - 1 && ct[ci + 1] <= lt) ci++
+    const car = C[ci]
+    if (last && Math.hypot(l.x - last.x, l.y - last.y) < 1) continue
+    const p = { x: l.x, y: l.y, speed: car.speed, gear: car.n_gear, drs: car.drs >= 10 }
+    raw.push(p)
+    last = p
+  }
+  const MAX = 300
+  if (raw.length <= MAX) return raw
+  const step = raw.length / MAX
+  const out: ChannelPoint[] = []
+  for (let i = 0; i < MAX; i++) out.push(raw[Math.floor(i * step)])
+  return out
 }
 
 /**
@@ -112,6 +149,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
   const [replayState, setReplayState] = useState<Omit<ReplayControls, 'toggle' | 'setSpeed' | 'seek'> | null>(null)
   const [trackOutline, setTrackOutline] = useState<{ x: number; y: number }[] | null>(null)
+  const [trackChannels, setTrackChannels] = useState<ChannelPoint[] | null>(null)
 
   const rawRef = useRef<RawData>(emptyRaw())
   const lapWindowRef = useRef(lapWindow)
@@ -175,6 +213,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     if (mode !== 'sim') return
     setReplayState(null)
     setTrackOutline(null)
+    setTrackChannels(simChannels())
     const sim = new RaceSim()
     sim.reset()
     setConnection('sim')
@@ -202,6 +241,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     setConnection('connecting')
     setError(null)
     setTrackOutline(null)
+    setTrackChannels(null)
 
     // Trace the circuit progressively from a single reference car's positions.
     let outlineRef: number | null = null
@@ -331,6 +371,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     setError(null)
     setReplayState(null)
     setTrackOutline(null)
+    setTrackChannels(null)
 
     // Telemetry window cache.
     let winFrom = Infinity
@@ -444,12 +485,20 @@ export function useRaceData(opts: DataOptions): DataResult {
         if (refDriver != null && Number.isFinite(anchor)) {
           const oFrom = new Date(anchor).toISOString()
           const oTo = new Date(Math.min(bounds.max, anchor + 160000)).toISOString()
-          api
-            .location(config, sessionKey, oFrom, oTo, signal)
-            .then((locs) => {
-              const ref = locs.filter((l) => l.driver_number === refDriver)
-              const pts = buildOutline(ref.length > 30 ? ref : locs)
-              if (!cancelled && !signal.aborted && pts.length > 20) setTrackOutline(pts)
+          Promise.all([
+            api.location(config, sessionKey, oFrom, oTo, signal),
+            api.carData(config, sessionKey, oFrom, oTo, signal).catch(() => [] as ApiCarData[]),
+          ])
+            .then(([locs, cars]) => {
+              if (cancelled || signal.aborted) return
+              const refLocs = locs.filter((l) => l.driver_number === refDriver)
+              const pts = buildOutline(refLocs.length > 30 ? refLocs : locs)
+              if (pts.length > 20) setTrackOutline(pts)
+              const refCars = cars.filter((c) => c.driver_number === refDriver)
+              if (refLocs.length > 30 && refCars.length > 30) {
+                const ch = buildChannels(refLocs, refCars)
+                if (ch.length > 20) setTrackChannels(ch)
+              }
             })
             .catch(() => {})
         }
@@ -491,7 +540,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     ? { ...replayState, toggle, setSpeed, seek }
     : null
 
-  return { snapshot, connection, error, lastUpdated, replay, trackOutline }
+  return { snapshot, connection, error, lastUpdated, replay, trackOutline, trackChannels }
 }
 
 export { SPEEDS }

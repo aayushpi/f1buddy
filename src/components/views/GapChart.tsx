@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { DriverState, RaceControlEntry } from '../../api/types'
-import { teamHex } from '../../utils/format'
+import { teamHex, teamLineDash } from '../../utils/format'
 
 interface Props {
   drivers: DriverState[] // sorted by position
@@ -114,6 +114,7 @@ export function GapChart({ drivers, raceControl, meetingName, sessionName, year 
   }
 
   const { lines, maxLap, maxGap, bands } = model
+  const dash = teamLineDash(drivers)
   const step = niceStep(maxGap)
   const yMax = Math.max(step, Math.ceil(maxGap / step) * step)
 
@@ -197,6 +198,7 @@ export function GapChart({ drivers, raceControl, meetingName, sessionName, year 
                 fill="none"
                 stroke={teamHex(l.driver.teamColour)}
                 strokeWidth={2.5}
+                strokeDasharray={dash.get(l.driver.driverNumber) || undefined}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
