@@ -345,9 +345,16 @@ export function useRaceData(opts: DataOptions): DataResult {
         ])
       if (cancelled) return
       const r = rawRef.current
-      r.intervals = intervals; r.positions = positions; r.laps = laps; r.stints = stints
-      r.pits = pits; r.raceControl = rc; r.weather = weather; r.teamRadio = radio
-      r.overtakes = overtakes; r.startingGrid = grid; r.results = results
+      // A failed/transient feed comes back as [] (see `safe`). Don't let that
+      // wipe good data on a live re-fetch — keep the previous values so the UI
+      // doesn't blink empty and then refill. Race feeds only ever grow.
+      const keep = <T,>(next: T[], prev: T[]) => (next.length ? next : prev)
+      r.intervals = keep(intervals, r.intervals); r.positions = keep(positions, r.positions)
+      r.laps = keep(laps, r.laps); r.stints = keep(stints, r.stints)
+      r.pits = keep(pits, r.pits); r.raceControl = keep(rc, r.raceControl)
+      r.weather = keep(weather, r.weather); r.teamRadio = keep(radio, r.teamRadio)
+      r.overtakes = keep(overtakes, r.overtakes); r.startingGrid = keep(grid, r.startingGrid)
+      r.results = keep(results, r.results)
     }
 
     // Best-effort one-shot circuit outline from an early green-flag lap. Retries
