@@ -244,6 +244,7 @@ export function useRaceData(opts: DataOptions): DataResult {
     follow.current = true
     c.tNow = c.tMax
     c.playing = true
+    c.speed = 1 // at the live edge you can only watch in real time
     dirty.current = true
     syncClock()
   }, [syncClock])
@@ -525,8 +526,10 @@ export function useRaceData(opts: DataOptions): DataResult {
           } else if (c.playing) {
             c.tNow = Math.min(c.tMax, c.tNow + CLOCK_INTERVAL * c.speed)
             if (c.tNow >= c.tMax) {
-              if (isLiveRef.current) follow.current = true // caught up → follow the live edge
-              else c.playing = false
+              if (isLiveRef.current) {
+                follow.current = true // caught up → follow the live edge
+                c.speed = 1 // and drop to real-time (can't outrun live)
+              } else c.playing = false
             }
             syncClock()
           }

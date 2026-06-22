@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import './styles/global.css'
-import { Header } from './components/Header'
 import { ViewTabs } from './components/ViewTabs'
 import { ReplayBar } from './components/ReplayBar'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -296,12 +295,11 @@ export default function App() {
     <div className="app">
       <div className="fx-grid" />
 
-      <Header snapshot={snapshot} />
-
       <ViewTabs
         active={activeView}
         onChange={setActiveView}
         connection={connection}
+        status={snapshot?.race.status ?? 'UNKNOWN'}
         onSettings={() => setSettingsOpen(true)}
       />
 

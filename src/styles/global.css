@@ -611,6 +611,35 @@ button {
   height: 34px;
   font-size: 15px;
 }
+
+/* Track-status light (doubles as connection state when no session is live). */
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+.status-dot.sd-green { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.status-dot.sd-yellow { background: var(--yellow); box-shadow: 0 0 11px var(--yellow); }
+.status-dot.sd-amber { background: var(--amber); box-shadow: 0 0 11px var(--amber); }
+.status-dot.sd-red { background: var(--red); box-shadow: 0 0 13px var(--red); }
+.status-dot.sd-white { background: #e9eef5; box-shadow: 0 0 10px rgba(233, 238, 245, 0.85); }
+.status-dot.sd-idle { background: var(--muted); }
+.status-dot.pulse { animation: pulse 1.3s ease-in-out infinite; }
+.status-dot-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.status-dot-label.sd-green { color: var(--green); }
+.status-dot-label.sd-yellow { color: var(--yellow); }
+.status-dot-label.sd-amber { color: var(--amber); }
+.status-dot-label.sd-red { color: var(--red); }
+.status-dot-label.sd-white { color: #e9eef5; }
 .viewtab {
   position: relative;
   border: 0;
@@ -1100,6 +1129,7 @@ button {
 }
 
 .replay-speeds button { padding: 6px 9px; font-size: 10px; }
+.replay-speeds button:disabled { opacity: 0.28; cursor: not-allowed; }
 
 /* Broadcast-style "go live" button: grey when you're behind (click to catch up),
    red and pulsing when you're riding the live edge. */
