@@ -44,9 +44,15 @@ export interface ReplayControls {
   playing: boolean
   speed: number
   lapMarkers: LapMarker[]
+  // The session is still in progress, so the timeline keeps growing.
+  live: boolean
+  // Playback is pinned to the live edge (following new data as it arrives).
+  atLive: boolean
   toggle: () => void
   setSpeed: (n: number) => void
   seek: (ms: number) => void
+  // Jump to the live edge and follow it (the "● LIVE" button).
+  goLive: () => void
 }
 
 export interface DataResult {
@@ -111,12 +117,12 @@ function buildOutline(locs: { x: number; y: number; date: string }[]): { x: numb
   return out
 }
 
-const FAST_INTERVAL = 4500
-const SLOW_INTERVAL = 12000
-const TELEMETRY_INTERVAL = 2000
 const SIM_INTERVAL = 1000
 const CLOCK_INTERVAL = 200 // replay tick
 const TRACE_BACK_MS = 20000 // telemetry history fetched behind the clock
+const LIVE_REFETCH_MS = 12000 // how often a live session pulls fresh data to extend the timeline
+const LIVE_WINDOW_MS = 30 * 60 * 1000 // OpenF1 treats data as "live" until 30 min after a session ends
+const AT_LIVE_MS = 5000 // within this of the edge counts as "at live"
 const SPEEDS = [1, 2, 4, 6, 12]
 
 const emptyRaw = (): RawData => ({
@@ -147,7 +153,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   const [connection, setConnection] = useState<Connection>('idle')
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<number | null>(null)
-  const [replayState, setReplayState] = useState<Omit<ReplayControls, 'toggle' | 'setSpeed' | 'seek'> | null>(null)
+  const [replayState, setReplayState] = useState<Omit<ReplayControls, 'toggle' | 'setSpeed' | 'seek' | 'goLive'> | null>(null)
   const [trackOutline, setTrackOutline] = useState<{ x: number; y: number }[] | null>(null)
   const [trackChannels, setTrackChannels] = useState<ChannelPoint[] | null>(null)
 
@@ -161,6 +167,8 @@ export function useRaceData(opts: DataOptions): DataResult {
   const clock = useRef({ tNow: 0, tMin: 0, tMax: 1, raceEnd: 1, playing: true, speed: 6 })
   const dirty = useRef(false) // force a rebuild on the next tick (after a seek)
   const markersRef = useRef<LapMarker[]>([])
+  const follow = useRef(false) // pinned to the live edge ("go live")
+  const isLiveRef = useRef(false) // the loaded session is still in progress
 
   useEffect(() => {
     if (rawRef.current.drivers.length && mode !== 'live') {
@@ -178,14 +186,18 @@ export function useRaceData(opts: DataOptions): DataResult {
       playing: c.playing,
       speed: c.speed,
       lapMarkers: markersRef.current,
+      live: isLiveRef.current,
+      atLive: follow.current || (isLiveRef.current && c.tNow >= c.tMax - AT_LIVE_MS),
     })
   }, [])
 
   const toggle = useCallback(() => {
     const c = clock.current
-    // Restart from the beginning if we hit the end.
-    if (!c.playing && c.tNow >= c.tMax - 250) c.tNow = c.tMin
+    // Restart from the beginning if we hit the end of a finished session.
+    if (!c.playing && !isLiveRef.current && c.tNow >= c.tMax - 250) c.tNow = c.tMin
     c.playing = !c.playing
+    // Pausing means you stop tracking the live edge.
+    if (!c.playing) follow.current = false
     dirty.current = true
     syncClock()
   }, [syncClock])
@@ -201,12 +213,24 @@ export function useRaceData(opts: DataOptions): DataResult {
   const seek = useCallback(
     (ms: number) => {
       const c = clock.current
+      // Seeking drops you out of live-follow (you've gone back to catch up).
+      follow.current = false
       c.tNow = Math.max(c.tMin, Math.min(c.tMax, ms))
       dirty.current = true
       syncClock()
     },
     [syncClock],
   )
+
+  // Jump to the live edge and follow it as new data streams in.
+  const goLive = useCallback(() => {
+    const c = clock.current
+    follow.current = true
+    c.tNow = c.tMax
+    c.playing = true
+    dirty.current = true
+    syncClock()
+  }, [syncClock])
 
   // ---- Simulation mode ----
   useEffect(() => {
@@ -228,139 +252,13 @@ export function useRaceData(opts: DataOptions): DataResult {
     return () => clearInterval(id)
   }, [mode])
 
-  // ---- Live (latest) mode: poll a session in progress ----
+  // ---- Live / replay: load a session and play it through time ----
+  // Whether you join an in-progress race or pick a past one, playback always
+  // starts at the beginning and only ever reveals data up to the clock — so no
+  // spoilers. A live session keeps re-fetching to extend the timeline, and the
+  // "go live" control pins playback to the leading edge.
   useEffect(() => {
-    if (mode !== 'live' || sessionKey !== 'latest') return
-    setReplayState(null)
-
-    let cancelled = false
-    const controller = new AbortController()
-    const { signal } = controller
-    rawRef.current = emptyRaw()
-    setSnapshot(null)
-    setConnection('connecting')
-    setError(null)
-    setTrackOutline(null)
-    setTrackChannels(null)
-
-    // Trace the circuit progressively from a single reference car's positions.
-    let outlineRef: number | null = null
-    const outlinePts: { x: number; y: number; date: string }[] = []
-
-    const fail = (e: unknown) => {
-      if (cancelled || signal.aborted) return
-      setError(e instanceof Error ? e.message : String(e))
-      setConnection('error')
-    }
-    const rebuild = () => {
-      if (cancelled) return
-      if (rawRef.current.drivers.length) {
-        setSnapshot(buildSnapshot(rawRef.current, lapWindowRef.current))
-        setLastUpdated(Date.now())
-        setConnection('live')
-      }
-    }
-
-    const bootstrap = async () => {
-      try {
-        const sessions = await api.sessions(config, { session_key: 'latest' }, signal)
-        const session: ApiSession | null = sessions.at(-1) ?? null
-        if (!session) throw new Error('No live session found.')
-        const key = session.session_key
-        rawRef.current.session = session
-        const [drivers, meetings] = await Promise.all([
-          api.drivers(config, key, signal),
-          api.meetings(config, { meeting_key: session.meeting_key }, signal).catch(() => []),
-        ])
-        rawRef.current.drivers = drivers as ApiDriver[]
-        rawRef.current.meeting = meetings.at(-1) ?? null
-        rebuild()
-        startPolling(key)
-      } catch (e) {
-        fail(e)
-      }
-    }
-
-    const pollFast = async (key: number) => {
-      try {
-        const [intervals, positions] = await Promise.all([
-          api.intervals(config, key, signal),
-          api.position(config, key, signal),
-        ])
-        rawRef.current.intervals = intervals
-        rawRef.current.positions = positions
-        rebuild()
-      } catch (e) {
-        fail(e)
-      }
-    }
-    const pollSlow = async (key: number) => {
-      try {
-        const [laps, stints, pits, raceControl, weather, teamRadio, overtakes, grid, results] =
-          await Promise.all([
-            api.laps(config, key, signal),
-            api.stints(config, key, signal),
-            api.pit(config, key, signal),
-            api.raceControl(config, key, signal),
-            api.weather(config, key, signal),
-            api.teamRadio(config, key, signal).catch(() => []),
-            api.overtakes(config, key, signal).catch(() => []),
-            api.startingGrid(config, key, signal).catch(() => []),
-            api.sessionResult(config, key, signal).catch(() => []),
-          ])
-        const r = rawRef.current
-        r.laps = laps; r.stints = stints; r.pits = pits; r.raceControl = raceControl
-        r.weather = weather; r.teamRadio = teamRadio; r.overtakes = overtakes
-        r.startingGrid = grid; r.results = results
-        rebuild()
-      } catch (e) {
-        fail(e)
-      }
-    }
-    const pollTelemetry = async (key: number) => {
-      if (!TELEMETRY_VIEWS.includes(viewRef.current)) return
-      try {
-        const from = new Date(Date.now() - 8000).toISOString()
-        const [carData, location] = await Promise.all([
-          api.carData(config, key, from, undefined, signal).catch(() => []),
-          api.location(config, key, from, undefined, signal).catch(() => []),
-        ])
-        if (carData.length) rawRef.current.carData = carData
-        if (location.length) rawRef.current.location = location
-        if (location.length) {
-          if (outlineRef == null) outlineRef = location[0].driver_number
-          for (const l of location) {
-            if (l.driver_number === outlineRef) outlinePts.push({ x: l.x, y: l.y, date: l.date })
-          }
-          if (outlinePts.length > 40) setTrackOutline(buildOutline(outlinePts))
-        }
-        rebuild()
-      } catch {
-        /* best effort */
-      }
-    }
-
-    let fastId: ReturnType<typeof setInterval>
-    let slowId: ReturnType<typeof setInterval>
-    let teleId: ReturnType<typeof setInterval>
-    const startPolling = (key: number) => {
-      pollFast(key); pollSlow(key); pollTelemetry(key)
-      fastId = setInterval(() => pollFast(key), FAST_INTERVAL)
-      slowId = setInterval(() => pollSlow(key), SLOW_INTERVAL)
-      teleId = setInterval(() => pollTelemetry(key), TELEMETRY_INTERVAL)
-    }
-
-    bootstrap()
-    return () => {
-      cancelled = true
-      controller.abort()
-      clearInterval(fastId); clearInterval(slowId); clearInterval(teleId)
-    }
-  }, [mode, config, sessionKey, reloadNonce])
-
-  // ---- Replay mode: load a historical session and play it through time ----
-  useEffect(() => {
-    if (mode !== 'live' || typeof sessionKey !== 'number') return
+    if (mode !== 'live') return
 
     let cancelled = false
     const controller = new AbortController()
@@ -372,7 +270,11 @@ export function useRaceData(opts: DataOptions): DataResult {
     setReplayState(null)
     setTrackOutline(null)
     setTrackChannels(null)
+    follow.current = false // default: watch from the beginning
+    isLiveRef.current = false
 
+    let key = 0
+    let gotOutline = false
     // Telemetry window cache.
     let winFrom = Infinity
     let winTo = -Infinity
@@ -380,7 +282,9 @@ export function useRaceData(opts: DataOptions): DataResult {
     let lastBuilt = -1
     let lastBuildWall = 0
 
-    const ensureTelemetry = (key: number) => {
+    const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[])
+
+    const ensureTelemetry = (k: number) => {
       if (!TELEMETRY_VIEWS.includes(viewRef.current) || fetchingTele) return
       const c = clock.current
       if (c.tNow >= winFrom && c.tNow <= winTo - 3000) return // covered
@@ -389,8 +293,8 @@ export function useRaceData(opts: DataOptions): DataResult {
       const from = new Date(c.tNow - TRACE_BACK_MS).toISOString()
       const to = new Date(c.tNow + span).toISOString()
       Promise.all([
-        api.carData(config, key, from, to, signal).catch(() => []),
-        api.location(config, key, from, to, signal).catch(() => []),
+        api.carData(config, k, from, to, signal).catch(() => []),
+        api.location(config, k, from, to, signal).catch(() => []),
       ])
         .then(([cd, loc]) => {
           rawRef.current.carData = cd
@@ -413,113 +317,173 @@ export function useRaceData(opts: DataOptions): DataResult {
       lastBuildWall = Date.now()
     }
 
+    // Pull every non-telemetry feed for the session into rawRef.
+    const fetchBundle = async (k: number) => {
+      const [intervals, positions, laps, stints, pits, rc, weather, radio, overtakes, grid, results] =
+        await Promise.all([
+          safe(api.intervals(config, k, signal)),
+          safe(api.position(config, k, signal)),
+          safe(api.laps(config, k, signal)),
+          safe(api.stints(config, k, signal)),
+          safe(api.pit(config, k, signal)),
+          safe(api.raceControl(config, k, signal)),
+          safe(api.weather(config, k, signal)),
+          safe(api.teamRadio(config, k, signal)),
+          safe(api.overtakes(config, k, signal)),
+          safe(api.startingGrid(config, k, signal)),
+          safe(api.sessionResult(config, k, signal)),
+        ])
+      if (cancelled) return
+      const r = rawRef.current
+      r.intervals = intervals; r.positions = positions; r.laps = laps; r.stints = stints
+      r.pits = pits; r.raceControl = rc; r.weather = weather; r.teamRadio = radio
+      r.overtakes = overtakes; r.startingGrid = grid; r.results = results
+    }
+
+    // Best-effort one-shot circuit outline from an early green-flag lap. Retries
+    // on the next live re-fetch if the early data wasn't usable yet.
+    const maybeFetchOutline = (k: number) => {
+      if (gotOutline) return
+      const r = rawRef.current
+      const refDriver =
+        r.results.find((x) => x.position === 1)?.driver_number ?? r.drivers[0]?.driver_number
+      const refLaps = r.laps
+        .filter((l) => l.driver_number === refDriver && l.date_start)
+        .sort((a, b) => a.lap_number - b.lap_number)
+      const anchorLap = refLaps.find((l) => l.lap_number >= 5) ?? refLaps[0]
+      if (refDriver == null || !anchorLap) return
+      const anchor = Date.parse(anchorLap.date_start!)
+      if (!Number.isFinite(anchor)) return
+      gotOutline = true // claim it; release again on failure so a later pass retries
+      const oFrom = new Date(anchor).toISOString()
+      const oTo = new Date(anchor + 160000).toISOString()
+      Promise.all([
+        api.location(config, k, oFrom, oTo, signal),
+        api.carData(config, k, oFrom, oTo, signal).catch(() => [] as ApiCarData[]),
+      ])
+        .then(([locs, cars]) => {
+          if (cancelled || signal.aborted) return
+          const refLocs = locs.filter((l) => l.driver_number === refDriver)
+          const pts = buildOutline(refLocs.length > 30 ? refLocs : locs)
+          if (pts.length > 20) setTrackOutline(pts)
+          else gotOutline = false
+          const refCars = cars.filter((c) => c.driver_number === refDriver)
+          if (refLocs.length > 30 && refCars.length > 30) {
+            const ch = buildChannels(refLocs, refCars)
+            if (ch.length > 20) setTrackChannels(ch)
+          }
+        })
+        .catch(() => {
+          gotOutline = false
+        })
+    }
+
+    // Extend the timeline end as new live data arrives (tMin / tNow untouched).
+    const extendTimeline = () => {
+      const r = rawRef.current
+      const bounds = rawTimeBounds(r)
+      const endIso = Date.parse(r.session?.date_end ?? '')
+      const c = clock.current
+      c.tMax = bounds.max
+      c.raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
+      markersRef.current = buildLapMarkers(r)
+    }
+
     let clockId: ReturnType<typeof setInterval>
+    let liveId: ReturnType<typeof setInterval> | undefined
+
+    const liveRefetch = async () => {
+      if (cancelled) return
+      try {
+        await fetchBundle(key)
+        if (cancelled) return
+        extendTimeline()
+        maybeFetchOutline(key)
+        dirty.current = true
+        syncClock()
+      } catch {
+        /* best effort */
+      }
+    }
 
     const bootstrap = async () => {
       try {
-        const sessions = await api.sessions(config, { session_key: sessionKey }, signal)
+        const sessionParams: Record<string, string | number> =
+          sessionKey === 'latest' ? { session_key: 'latest' } : { session_key: sessionKey }
+        const sessions = await api.sessions(config, sessionParams, signal)
         const session: ApiSession | null = sessions.at(-1) ?? null
-        if (!session) throw new Error('Session not found.')
+        if (!session) {
+          throw new Error(sessionKey === 'latest' ? 'No live session found.' : 'Session not found.')
+        }
+        key = session.session_key
         rawRef.current.session = session
 
-        // Resilient: a single failing feed shouldn't blank the whole replay.
-        const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[])
-        const [drivers, meetings, intervals, positions, laps, stints, pits, rc, weather, radio, overtakes, grid, results] =
-          await Promise.all([
-            api.drivers(config, sessionKey, signal),
-            safe(api.meetings(config, { meeting_key: session.meeting_key }, signal)),
-            safe(api.intervals(config, sessionKey, signal)),
-            safe(api.position(config, sessionKey, signal)),
-            safe(api.laps(config, sessionKey, signal)),
-            safe(api.stints(config, sessionKey, signal)),
-            safe(api.pit(config, sessionKey, signal)),
-            safe(api.raceControl(config, sessionKey, signal)),
-            safe(api.weather(config, sessionKey, signal)),
-            safe(api.teamRadio(config, sessionKey, signal)),
-            safe(api.overtakes(config, sessionKey, signal)),
-            safe(api.startingGrid(config, sessionKey, signal)),
-            safe(api.sessionResult(config, sessionKey, signal)),
-          ])
+        const endMs = Date.parse(session.date_end)
+        const isLive = Number.isFinite(endMs) ? Date.now() < endMs + LIVE_WINDOW_MS : true
+        isLiveRef.current = isLive
+
+        const [drivers, meetings] = await Promise.all([
+          api.drivers(config, key, signal),
+          safe(api.meetings(config, { meeting_key: session.meeting_key }, signal)),
+        ])
         if (cancelled) return
-        const r = rawRef.current
-        r.drivers = drivers as ApiDriver[]
-        r.meeting = meetings.at(-1) ?? null
-        r.intervals = intervals; r.positions = positions; r.laps = laps; r.stints = stints
-        r.pits = pits; r.raceControl = rc; r.weather = weather; r.teamRadio = radio
-        r.overtakes = overtakes; r.startingGrid = grid; r.results = results
+        rawRef.current.drivers = drivers as ApiDriver[]
+        rawRef.current.meeting = meetings.at(-1) ?? null
 
-        if (!r.drivers.length) throw new Error('No data returned for this session.')
+        await fetchBundle(key)
+        if (cancelled) return
+        if (!rawRef.current.drivers.length) throw new Error('No data returned for this session.')
 
-        const bounds = rawTimeBounds(r)
+        const bounds = rawTimeBounds(rawRef.current)
         const endIso = Date.parse(session.date_end)
         // Guard against a degenerate timeline (no dated records): show the full
         // session statically rather than a frozen empty screen.
         const hasTimeline = bounds.max > bounds.min + 1000
         const raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
-        markersRef.current = buildLapMarkers(r)
+        markersRef.current = buildLapMarkers(rawRef.current)
         clock.current = {
           tMin: bounds.min,
           tMax: bounds.max,
           raceEnd,
-          tNow: hasTimeline ? bounds.min : bounds.max,
-          playing: hasTimeline,
-          speed: 6,
+          tNow: hasTimeline ? bounds.min : bounds.max, // start at the beginning
+          playing: hasTimeline || isLive,
+          speed: isLive ? 1 : 6, // live: watch in real time; past: fast replay
         }
         syncClock()
-        setConnection('replay')
+        setConnection(isLive ? 'live' : 'replay')
         build()
-        ensureTelemetry(sessionKey)
-
-        // One-shot circuit outline: trace ~2.5 min of the winner's location
-        // (a car guaranteed to have run a full lap) right after the start.
-        const refDriver =
-          results.find((x) => x.position === 1)?.driver_number ?? r.drivers[0]?.driver_number
-        // Anchor the window to an early-but-green-flag lap of the reference car.
-        // Anchoring to bounds.min lands in the pre-race/grid period where the
-        // location feed reports (0,0) for every car.
-        const refLaps = r.laps
-          .filter((l) => l.driver_number === refDriver && l.date_start)
-          .sort((a, b) => a.lap_number - b.lap_number)
-        const anchorLap = refLaps.find((l) => l.lap_number >= 5) ?? refLaps[0]
-        const anchor = anchorLap ? Date.parse(anchorLap.date_start!) : bounds.min
-        if (refDriver != null && Number.isFinite(anchor)) {
-          const oFrom = new Date(anchor).toISOString()
-          const oTo = new Date(Math.min(bounds.max, anchor + 160000)).toISOString()
-          Promise.all([
-            api.location(config, sessionKey, oFrom, oTo, signal),
-            api.carData(config, sessionKey, oFrom, oTo, signal).catch(() => [] as ApiCarData[]),
-          ])
-            .then(([locs, cars]) => {
-              if (cancelled || signal.aborted) return
-              const refLocs = locs.filter((l) => l.driver_number === refDriver)
-              const pts = buildOutline(refLocs.length > 30 ? refLocs : locs)
-              if (pts.length > 20) setTrackOutline(pts)
-              const refCars = cars.filter((c) => c.driver_number === refDriver)
-              if (refLocs.length > 30 && refCars.length > 30) {
-                const ch = buildChannels(refLocs, refCars)
-                if (ch.length > 20) setTrackChannels(ch)
-              }
-            })
-            .catch(() => {})
-        }
+        ensureTelemetry(key)
+        maybeFetchOutline(key)
 
         clockId = setInterval(() => {
           const c = clock.current
-          if (c.playing) {
+          if (follow.current) {
+            // Pinned to the live edge.
+            if (c.tNow !== c.tMax) {
+              c.tNow = c.tMax
+              syncClock()
+            }
+          } else if (c.playing) {
             c.tNow = Math.min(c.tMax, c.tNow + CLOCK_INTERVAL * c.speed)
-            if (c.tNow >= c.tMax) c.playing = false
+            if (c.tNow >= c.tMax) {
+              if (isLiveRef.current) follow.current = true // caught up → follow the live edge
+              else c.playing = false
+            }
             syncClock()
           }
-          ensureTelemetry(sessionKey)
+          ensureTelemetry(key)
           // Rebuild immediately after a seek; otherwise throttle the heavy
           // filter+rebuild to ~3/s so playback stays smooth on tablets.
           if (dirty.current) {
             dirty.current = false
             build()
-          } else if (c.playing && c.tNow !== lastBuilt && Date.now() - lastBuildWall >= 320) {
+          } else if ((c.playing || follow.current) && c.tNow !== lastBuilt && Date.now() - lastBuildWall >= 320) {
             build()
           }
         }, CLOCK_INTERVAL)
+
+        // Keep an in-progress session's timeline growing.
+        if (isLive) liveId = setInterval(liveRefetch, LIVE_REFETCH_MS)
       } catch (e) {
         if (!cancelled && !signal.aborted) {
           setError(e instanceof Error ? e.message : String(e))
@@ -533,11 +497,12 @@ export function useRaceData(opts: DataOptions): DataResult {
       cancelled = true
       controller.abort()
       clearInterval(clockId)
+      if (liveId) clearInterval(liveId)
     }
   }, [mode, config, sessionKey, syncClock, reloadNonce])
 
   const replay: ReplayControls | null = replayState
-    ? { ...replayState, toggle, setSpeed, seek }
+    ? { ...replayState, toggle, setSpeed, seek, goLive }
     : null
 
   return { snapshot, connection, error, lastUpdated, replay, trackOutline, trackChannels }

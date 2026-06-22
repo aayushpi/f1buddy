@@ -20,6 +20,7 @@ import { Strategy } from './components/views/Strategy'
 import { RaceControlView } from './components/views/RaceControlView'
 import { WeatherView } from './components/views/WeatherView'
 import { useRaceData, type ActiveView, type DataMode } from './store/useRaceData'
+import { defaultConfig } from './api/openf1'
 
 const LS_KEY = 'f1buddy.state.v2'
 
@@ -33,7 +34,7 @@ interface Persisted {
 
 const DEFAULTS: Persisted = {
   mode: 'sim',
-  settings: { baseUrl: 'https://api.openf1.org/v1', apiKey: '', sessionKey: 'latest' },
+  settings: { baseUrl: defaultConfig.baseUrl, apiKey: '', sessionKey: 'latest' },
   lapWindow: 6,
   selected: [],
   activeView: 'timing',

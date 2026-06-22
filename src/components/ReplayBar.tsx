@@ -18,7 +18,7 @@ function elapsed(ms: number): string {
 }
 
 export function ReplayBar({ replay, currentLap }: Props) {
-  const { tMin, tMax, tNow, playing, speed, lapMarkers } = replay
+  const { tMin, tMax, tNow, playing, speed, lapMarkers, live, atLive } = replay
   const dur = tMax - tMin || 1
   const pct = ((tNow - tMin) / dur) * 100
   const atEnd = tNow >= tMax - 250
@@ -94,6 +94,18 @@ export function ReplayBar({ replay, currentLap }: Props) {
           </button>
         ))}
       </div>
+
+      {live && (
+        <button
+          className={`live-btn ${atLive ? 'on' : ''}`}
+          onClick={replay.goLive}
+          disabled={atLive}
+          title={atLive ? 'Watching live' : 'Jump to the live edge'}
+        >
+          <span className="live-dot" />
+          LIVE
+        </button>
+      )}
     </div>
   )
 }
