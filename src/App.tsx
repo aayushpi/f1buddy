@@ -224,7 +224,11 @@ export default function App() {
       case 'map':
         return (
           <div className="viewbody">
-            <TrackMap cars={snapshot.trackMap} outline={trackOutline} />
+            <TrackMap
+              cars={snapshot.trackMap}
+              outline={trackOutline}
+              circuit={[snapshot.race.circuit, snapshot.race.countryName, snapshot.race.meetingName]}
+            />
           </div>
         )
       case 'speedmap':
