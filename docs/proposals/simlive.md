@@ -15,7 +15,7 @@ Example: `/?simlive=9558&simspeed=60&simstart=300` joins ~5 min into the 2024
 British GP with the live edge racing ahead at 60×, so you can watch from the
 start, fall behind, and hit **● LIVE** to catch up. Point the app's data source
 at the proxy first so you don't hit the free-tier rate limit. simlive overrides
-the Demo/Live toggle while the param is present.
+the configured session while the param is present.
 
 ## Problem
 

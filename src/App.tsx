@@ -19,7 +19,7 @@ import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
 import { RaceControlView } from './components/views/RaceControlView'
 import { WeatherView } from './components/views/WeatherView'
-import { useRaceData, type ActiveView, type DataMode, type SimLive } from './store/useRaceData'
+import { useRaceData, type ActiveView, type SimLive } from './store/useRaceData'
 import { defaultConfig } from './api/openf1'
 
 // Dev rehearsal: ?simlive=<session_key>[&simspeed=N][&simstart=seconds] replays a
@@ -38,7 +38,6 @@ function parseSimLive(): SimLive | null {
 const LS_KEY = 'f1buddy.state.v2'
 
 interface Persisted {
-  mode: DataMode
   settings: AppSettings
   lapWindow: number
   selected: number[]
@@ -46,7 +45,6 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  mode: 'sim',
   settings: { baseUrl: defaultConfig.baseUrl, apiKey: '', sessionKey: 'latest' },
   lapWindow: 6,
   selected: [],
@@ -65,7 +63,6 @@ function loadState(): Persisted {
 
 export default function App() {
   const [initial] = useState(loadState)
-  const [mode, setMode] = useState<DataMode>(initial.mode)
   const [settings, setSettings] = useState<AppSettings>(initial.settings)
   const [lapWindow, setLapWindow] = useState(initial.lapWindow)
   const [selected, setSelected] = useState<Set<number>>(new Set(initial.selected))
@@ -90,9 +87,9 @@ export default function App() {
   const simLive = useMemo(parseSimLive, [])
 
   const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
-    // simlive forces a live load of the chosen session, overriding Demo/Live.
-    mode: simLive ? 'live' : mode,
+    mode: 'live',
     config,
+    // simlive forces loading a specific session (overriding the configured one).
     sessionKey: simLive ? simLive.key : sessionKey,
     simLive,
     lapWindow,
@@ -108,12 +105,12 @@ export default function App() {
 
   // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
   // surfaced as a stacked, auto-dismissing popover. Reset per session.
-  const { notices, dismiss } = useRaceNotices(snapshot, `${mode}:${String(sessionKey)}`)
+  const { notices, dismiss } = useRaceNotices(snapshot, String(sessionKey))
 
   // When an in-progress race finishes loading, ask once how to start it. Default
   // is spoiler-free (the engine already begins at lights-out); jumping to live
   // is an explicit, separated choice. Keyed per load so it only asks once.
-  const loadId = `${mode}:${String(sessionKey)}:${reloadNonce}`
+  const loadId = `${String(sessionKey)}:${reloadNonce}`
   const isLive = replay?.live ?? false
   const ready = !!snapshot && snapshot.drivers.length > 0
   useEffect(() => {
@@ -133,19 +130,18 @@ export default function App() {
   }
 
   useEffect(() => {
-    const data: Persisted = { mode, settings, lapWindow, selected: [...selected], activeView }
+    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView }
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(data))
     } catch {
       /* ignore */
     }
-  }, [mode, settings, lapWindow, selected, activeView])
+  }, [settings, lapWindow, selected, activeView])
 
-  // Load a specific historical session picked from the browser: stash its key
-  // and switch to Live so the polling store replays it.
+  // Load a specific session picked from the browser: stash its key and the
+  // store loads/replays it.
   const loadSession = (key: number) => {
     setSettings((s) => ({ ...s, sessionKey: String(key) }))
-    setMode('live')
   }
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
@@ -173,16 +169,13 @@ export default function App() {
                   <button className="es-btn primary" onClick={() => setReloadNonce((n) => n + 1)}>
                     Retry
                   </button>
-                  <button className="es-btn ghost" onClick={() => setMode('sim')}>
-                    Use Demo instead
-                  </button>
                 </div>
               </>
             ) : (
               <>
                 <div className="spinner" />
                 <div className="big">
-                  {mode === 'live' && typeof sessionKey === 'number'
+                  {typeof sessionKey === 'number'
                     ? 'Loading session — fetching the full race…'
                     : connection === 'connecting'
                       ? 'Connecting to the timing feed…'
@@ -231,7 +224,7 @@ export default function App() {
       case 'map':
         return (
           <div className="viewbody">
-            <TrackMap cars={snapshot.trackMap} outline={trackOutline} showSimOutline={mode === 'sim'} />
+            <TrackMap cars={snapshot.trackMap} outline={trackOutline} />
           </div>
         )
       case 'speedmap':
@@ -318,12 +311,10 @@ export default function App() {
         settings={settings}
         onClose={() => setSettingsOpen(false)}
         onApply={setSettings}
-        mode={mode}
-        onMode={setMode}
         config={config}
         sessionKey={sessionKey}
         activeLabel={
-          mode === 'live' && typeof sessionKey === 'number' && snapshot?.race
+          typeof sessionKey === 'number' && snapshot?.race
             ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
             : null
         }

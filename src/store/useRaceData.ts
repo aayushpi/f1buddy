@@ -8,11 +8,8 @@ import {
   rawTimeBounds,
   type RawData,
 } from '../utils/derive'
-import { RaceSim } from '../data/sim'
-import { simChannels } from '../data/circuit'
-
-export type DataMode = 'sim' | 'live'
-export type Connection = 'idle' | 'connecting' | 'live' | 'sim' | 'replay' | 'error'
+export type DataMode = 'live'
+export type Connection = 'idle' | 'connecting' | 'live' | 'replay' | 'error'
 export type ActiveView =
   | 'timing'
   | 'map'
@@ -131,7 +128,6 @@ function buildOutline(locs: { x: number; y: number; date: string }[]): { x: numb
   return out
 }
 
-const SIM_INTERVAL = 1000
 const CLOCK_INTERVAL = 200 // replay tick
 const TRACE_BACK_MS = 20000 // telemetry history fetched behind the clock
 const LIVE_REFETCH_MS = 12000 // how often a live session pulls fresh data to extend the timeline
@@ -185,11 +181,11 @@ export function useRaceData(opts: DataOptions): DataResult {
   const follow = useRef(false) // pinned to the live edge ("go live")
   const isLiveRef = useRef(false) // the loaded session is still in progress
 
+  // A lap-window change should re-reveal the current moment immediately, even
+  // when playback is paused; the clock loop rebuilds on the next tick.
   useEffect(() => {
-    if (rawRef.current.drivers.length && mode !== 'live') {
-      setSnapshot(buildSnapshot(rawRef.current, lapWindow))
-    }
-  }, [lapWindow, mode])
+    dirty.current = true
+  }, [lapWindow])
 
   // ---- Replay controls (stable) ----
   const syncClock = useCallback(() => {
@@ -248,26 +244,6 @@ export function useRaceData(opts: DataOptions): DataResult {
     dirty.current = true
     syncClock()
   }, [syncClock])
-
-  // ---- Simulation mode ----
-  useEffect(() => {
-    if (mode !== 'sim') return
-    setReplayState(null)
-    setTrackOutline(null)
-    setTrackChannels(simChannels())
-    const sim = new RaceSim()
-    sim.reset()
-    setConnection('sim')
-    setError(null)
-    const tick = () => {
-      rawRef.current = sim.snapshot()
-      setSnapshot(buildSnapshot(rawRef.current, lapWindowRef.current))
-      setLastUpdated(Date.now())
-    }
-    tick()
-    const id = setInterval(tick, SIM_INTERVAL)
-    return () => clearInterval(id)
-  }, [mode])
 
   // ---- Live / replay: load a session and play it through time ----
   // Whether you join an in-progress race or pick a past one, playback always
