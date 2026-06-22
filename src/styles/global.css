@@ -1044,6 +1044,16 @@ button {
   );
   box-shadow: inset -1px 0 0 rgba(170, 186, 224, 0.7);
 }
+/* Formation lap ("lap 0") — solid, a touch tinted toward the racing accent so
+   it reads as between standing pre-race and green-flag racing. */
+.formation-band {
+  position: absolute;
+  top: 20px;
+  height: 6px;
+  pointer-events: none;
+  background: rgba(228, 182, 86, 0.92); /* warm amber: distinct from cyan racing + slate pre-race */
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6); /* lights-out boundary */
+}
 /* "Pre-race" sits at the very left of the same row as the lap numbers. */
 .prerace-label {
   position: absolute;
@@ -1054,6 +1064,11 @@ button {
   color: #aeb6cc;
   white-space: nowrap;
   pointer-events: none;
+}
+/* "0" label for the formation lap, centred on its band, tinted to match. */
+.prerace-label.formation {
+  transform: translateX(-50%);
+  color: #e3c270;
 }
 .scrub::-webkit-slider-thumb {
   -webkit-appearance: none;

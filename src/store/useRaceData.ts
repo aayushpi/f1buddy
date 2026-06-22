@@ -54,6 +54,10 @@ export interface ReplayControls {
   playing: boolean
   speed: number
   lapMarkers: LapMarker[]
+  // Start of the formation/grid window (session start) when it sits before lap 1;
+  // null if unknown. Everything tMin..formationStart is pre-race standing time,
+  // formationStart..lap1 is the formation lap ("lap 0").
+  formationStart: number | null
   // The session is still in progress, so the timeline keeps growing.
   live: boolean
   // Playback is pinned to the live edge (following new data as it arrives).
@@ -177,6 +181,7 @@ export function useRaceData(opts: DataOptions): DataResult {
   const clock = useRef({ tNow: 0, tMin: 0, tMax: 1, raceEnd: 1, playing: true, speed: 6 })
   const dirty = useRef(false) // force a rebuild on the next tick (after a seek)
   const markersRef = useRef<LapMarker[]>([])
+  const formationStartRef = useRef<number | null>(null)
   const follow = useRef(false) // pinned to the live edge ("go live")
   const isLiveRef = useRef(false) // the loaded session is still in progress
 
@@ -196,6 +201,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       playing: c.playing,
       speed: c.speed,
       lapMarkers: markersRef.current,
+      formationStart: formationStartRef.current,
       live: isLiveRef.current,
       atLive: follow.current || (isLiveRef.current && c.tNow >= c.tMax - AT_LIVE_MS),
     })
@@ -282,6 +288,18 @@ export function useRaceData(opts: DataOptions): DataResult {
     setTrackChannels(null)
     follow.current = false // default: watch from the beginning
     isLiveRef.current = false
+    formationStartRef.current = null
+
+    // Grid/formation starts at the session start, when it sits a sensible gap
+    // before lap 1. (No "lap 0" exists in the feed, so we derive it.)
+    const computeFormation = () => {
+      const grid = Date.parse(rawRef.current.session?.date_start ?? '')
+      const racing = markersRef.current[0]?.t
+      formationStartRef.current =
+        Number.isFinite(grid) && racing != null && grid > clock.current.tMin && grid < racing && racing - grid < 15 * 60 * 1000
+          ? grid
+          : null
+    }
 
     let key = 0
     let gotOutline = false
@@ -407,6 +425,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       // feed would otherwise make the scrubber's lap ticks blink out and back.
       const m = buildLapMarkers(r)
       if (m.length || markersRef.current.length === 0) markersRef.current = m
+      computeFormation()
     }
 
     let clockId: ReturnType<typeof setInterval>
@@ -480,6 +499,7 @@ export function useRaceData(opts: DataOptions): DataResult {
           playing: hasTimeline || isLive,
           speed: isLive ? 1 : 6, // live: watch in real time; past: fast replay
         }
+        computeFormation()
         syncClock()
         setConnection(isLive ? 'live' : 'replay')
         build()
