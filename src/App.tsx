@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import './styles/global.css'
 import { Header } from './components/Header'
@@ -9,6 +9,7 @@ import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
 import { NoticeStack } from './components/NoticeStack'
+import { LiveEntryChoice } from './components/LiveEntryChoice'
 import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
@@ -60,6 +61,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
+  // Spoiler-safe entry prompt for in-progress races (start-from-beginning vs live).
+  const [liveChoiceOpen, setLiveChoiceOpen] = useState(false)
+  const livePromptKey = useRef<string | null>(null)
 
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
@@ -89,6 +93,28 @@ export default function App() {
   // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
   // surfaced as a stacked, auto-dismissing popover. Reset per session.
   const { notices, dismiss } = useRaceNotices(snapshot, `${mode}:${String(sessionKey)}`)
+
+  // When an in-progress race finishes loading, ask once how to start it. Default
+  // is spoiler-free (the engine already begins at lights-out); jumping to live
+  // is an explicit, separated choice. Keyed per load so it only asks once.
+  const loadId = `${mode}:${String(sessionKey)}:${reloadNonce}`
+  const isLive = replay?.live ?? false
+  const ready = !!snapshot && snapshot.drivers.length > 0
+  useEffect(() => {
+    if (isLive && ready && livePromptKey.current !== loadId) {
+      livePromptKey.current = loadId
+      setLiveChoiceOpen(true)
+    }
+  }, [isLive, ready, loadId])
+
+  const watchFromStart = () => {
+    replay?.seek(replay.tMin) // guarantee the very beginning, however long the prompt was up
+    setLiveChoiceOpen(false)
+  }
+  const jumpToLive = () => {
+    replay?.goLive()
+    setLiveChoiceOpen(false)
+  }
 
   useEffect(() => {
     const data: Persisted = { mode, settings, lapWindow, selected: [...selected], activeView }
@@ -287,6 +313,18 @@ export default function App() {
         }
         onLoadSession={loadSession}
       />
+
+      {liveChoiceOpen && replay?.live && (
+        <LiveEntryChoice
+          label={
+            snapshot?.race
+              ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
+              : null
+          }
+          onWatchFromStart={watchFromStart}
+          onJumpToLive={jumpToLive}
+        />
+      )}
     </div>
   )
 }
