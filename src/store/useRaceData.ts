@@ -403,7 +403,10 @@ export function useRaceData(opts: DataOptions): DataResult {
       const c = clock.current
       c.tMax = bounds.max
       c.raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
-      markersRef.current = buildLapMarkers(r)
+      // Never replace existing lap markers with an empty set — a transient empty
+      // feed would otherwise make the scrubber's lap ticks blink out and back.
+      const m = buildLapMarkers(r)
+      if (m.length || markersRef.current.length === 0) markersRef.current = m
     }
 
     let clockId: ReturnType<typeof setInterval>
