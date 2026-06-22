@@ -128,10 +128,36 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
   const dateLte = <T extends { date: string } & Timed>(arr: T[]) =>
     arr.filter((r) => recT(r) <= cutoffMs)
 
-  const laps = raw.laps.filter((l) => {
-    const v = lapT(l)
-    return Number.isFinite(v) && v <= cutoffMs
-  })
+  // Reveal a lap's record as soon as it starts (so the current-lap counter is
+  // right), but only expose each sector / lap time once the clock has actually
+  // passed that crossing. Otherwise a completed lap's times — and the
+  // fastest-sector / fastest-lap alerts they trigger — would appear the instant
+  // the lap began (i.e. spoilers at the start of every lap).
+  const laps = raw.laps
+    .filter((l) => {
+      const v = lapT(l)
+      return Number.isFinite(v) && v <= cutoffMs
+    })
+    .map((l) => {
+      const start = lapT(l)
+      const s1 = l.duration_sector_1
+      const s2 = l.duration_sector_2
+      const dur = l.lap_duration
+      const cross1 = s1 != null ? start + s1 * 1000 : null
+      const cross2 = s1 != null && s2 != null ? start + (s1 + s2) * 1000 : null
+      const crossEnd = dur != null && dur > 0 ? start + dur * 1000 : null
+      const show1 = cross1 == null || cross1 <= cutoffMs
+      const show2 = cross2 == null || cross2 <= cutoffMs
+      const showEnd = crossEnd == null || crossEnd <= cutoffMs
+      if (show1 && show2 && showEnd) return l // fully run; nothing to hide
+      return {
+        ...l,
+        duration_sector_1: show1 ? l.duration_sector_1 : null,
+        duration_sector_2: show2 ? l.duration_sector_2 : null,
+        duration_sector_3: showEnd ? l.duration_sector_3 : null,
+        lap_duration: showEnd ? l.lap_duration : null,
+      }
+    })
   let currentLap = 1
   for (const l of laps) if (l.lap_number > currentLap) currentLap = l.lap_number
 
