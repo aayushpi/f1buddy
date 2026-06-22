@@ -593,8 +593,23 @@ button {
 .viewtabs {
   flex: 0 0 auto;
   display: flex;
+  align-items: center;
   gap: 4px;
   padding: 6px;
+}
+/* Connection dot + settings, pushed to the right edge of the nav row. */
+.viewtabs-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 10px;
+  flex: 0 0 auto;
+}
+.viewtabs-controls .icon-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
 }
 .viewtab {
   position: relative;

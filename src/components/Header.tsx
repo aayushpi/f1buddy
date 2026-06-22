@@ -1,5 +1,4 @@
 import type { RaceSnapshot, TrackStatus } from '../api/types'
-import type { Connection } from '../store/useRaceData'
 
 const STATUS_LABEL: Record<TrackStatus, string> = {
   GREEN: 'Track Clear',
@@ -25,17 +24,17 @@ const STATUS_SUB: Record<TrackStatus, string> = {
 
 interface Props {
   snapshot: RaceSnapshot | null
-  connection: Connection
-  onSettings: () => void
 }
 
-// The header is deliberately sparse: only the things that actually change as the
-// race unfolds. Branding, circuit name, fastest-lap and the load/Demo·Live
-// controls were removed — they're either static for the whole session (so you
-// already know them) or one-time setup (now in Settings).
-export function Header({ snapshot, connection, onSettings }: Props) {
+// Just the flag status + lap, and only once a session is underway. Before data
+// arrives there's nothing useful to show, so the header collapses entirely
+// rather than displaying a "Standby / Awaiting Data" placeholder. (Settings and
+// the connection dot now live in the view-tabs row.)
+export function Header({ snapshot }: Props) {
   const race = snapshot?.race
   const status = race?.status ?? 'UNKNOWN'
+  if (!race || status === 'UNKNOWN') return null
+
   const pulse = status === 'YELLOW' || status === 'DOUBLE_YELLOW' || status === 'SC' || status === 'VSC'
 
   return (
@@ -47,20 +46,11 @@ export function Header({ snapshot, connection, onSettings }: Props) {
           <span className="sub">{STATUS_SUB[status]}</span>
         </div>
         <div className="status-lap">
-          <span className="kicker">{race?.sessionName ?? 'Session'}</span>
+          <span className="kicker">{race.sessionName}</span>
           <span className="value-lg mono">
-            {race?.currentLap != null ? `LAP ${race.currentLap}` : '—'}
+            {race.currentLap != null ? `LAP ${race.currentLap}` : '—'}
           </span>
         </div>
-      </div>
-
-      <div className="header-spacer" />
-
-      <div className="panel controls">
-        <span className={`conn-dot conn-${connection}`} title={`Status: ${connection}`} />
-        <button className="icon-btn" onClick={onSettings} title="Settings" aria-label="Settings">
-          ⚙
-        </button>
       </div>
     </header>
   )

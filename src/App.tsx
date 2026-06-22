@@ -296,13 +296,14 @@ export default function App() {
     <div className="app">
       <div className="fx-grid" />
 
-      <Header
-        snapshot={snapshot}
+      <Header snapshot={snapshot} />
+
+      <ViewTabs
+        active={activeView}
+        onChange={setActiveView}
         connection={connection}
         onSettings={() => setSettingsOpen(true)}
       />
-
-      <ViewTabs active={activeView} onChange={setActiveView} />
 
       {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
 
