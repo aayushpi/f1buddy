@@ -23,6 +23,13 @@ export function ReplayBar({ replay, currentLap }: Props) {
   const pct = ((tNow - tMin) / dur) * 100
   const atEnd = tNow >= tMax - 250
 
+  // Everything before lap 1 (formation / grid / standing start) is "pre-race".
+  // We keep it on the timeline but shade it so it's clearly not racing.
+  const raceStartT = lapMarkers.length ? lapMarkers[0].t : tMin
+  const prePct = Math.max(0, Math.min(100, ((raceStartT - tMin) / dur) * 100))
+  const showPreBand = prePct > 0.8
+  const showPreLabel = prePct >= 7
+
   // Show every lap as a notch; label majors so a long race stays legible.
   const majorEvery = lapMarkers.length > 40 ? 10 : 5
   const jumpToLap = (lap: number) => {
@@ -54,6 +61,11 @@ export function ReplayBar({ replay, currentLap }: Props) {
         <span className="mono time">{clock(tNow)}</span>
         <div className="scrub-wrap">
           <div className="lap-ticks">
+            {showPreLabel && (
+              <span className="prerace-label" style={{ left: 0 }}>
+                Pre-race
+              </span>
+            )}
             {lapMarkers.map((m) => {
               const left = ((m.t - tMin) / dur) * 100
               if (left < 0 || left > 100) return null
@@ -71,6 +83,7 @@ export function ReplayBar({ replay, currentLap }: Props) {
               )
             })}
           </div>
+          {showPreBand && <div className="prerace-band" style={{ width: `${prePct}%` }} />}
           <input
             className="scrub"
             type="range"

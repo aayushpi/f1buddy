@@ -1021,9 +1021,39 @@ button {
   appearance: none;
   width: 100%;
   height: 6px;
+  margin: 0;
+  display: block;
   border-radius: 3px;
   background: linear-gradient(90deg, var(--accent) var(--pct, 0%), rgba(255,255,255,0.08) var(--pct, 0%));
   outline: none;
+}
+
+/* Pre-race (formation/grid/standing start) shaded distinctly over the track so
+   it reads as "not racing yet", with a boundary line at lights-out (lap 1). */
+.prerace-band {
+  position: absolute;
+  left: 0;
+  top: 20px;
+  height: 6px;
+  border-radius: 3px 0 0 3px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(150, 162, 196, 0.5) 0 4px,
+    rgba(150, 162, 196, 0.14) 4px 8px
+  );
+  box-shadow: inset -1px 0 0 rgba(170, 186, 224, 0.7);
+}
+/* "Pre-race" sits at the very left of the same row as the lap numbers. */
+.prerace-label {
+  position: absolute;
+  top: 0;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  color: #aeb6cc;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .scrub::-webkit-slider-thumb {
   -webkit-appearance: none;
