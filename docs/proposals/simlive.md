@@ -1,8 +1,21 @@
-# Proposal: `simlive` — rehearse live mode against a past race
+# `simlive` — rehearse live mode against a past race
 
-Status: **Proposed** (not implemented)
-Owner: TBD
+Status: **Implemented**
 Related: live engine in `src/store/useRaceData.ts`, entry choice in `src/components/LiveEntryChoice.tsx`, proxy in `server/proxy.mjs`
+
+## Usage
+
+```
+/?simlive=<session_key>          # e.g. 9558 (2024 British GP) or 11307 (2026 Barcelona GP)
+&simspeed=<n>                    # virtual-edge speed multiplier (default 1)
+&simstart=<seconds-from-start>   # how far in the virtual "now" begins (default 1500 = 25 min)
+```
+
+Example: `/?simlive=9558&simspeed=60&simstart=300` joins ~5 min into the 2024
+British GP with the live edge racing ahead at 60×, so you can watch from the
+start, fall behind, and hit **● LIVE** to catch up. Point the app's data source
+at the proxy first so you don't hit the free-tier rate limit. simlive overrides
+the Demo/Live toggle while the param is present.
 
 ## Problem
 

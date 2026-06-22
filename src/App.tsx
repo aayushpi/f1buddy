@@ -20,8 +20,21 @@ import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
 import { RaceControlView } from './components/views/RaceControlView'
 import { WeatherView } from './components/views/WeatherView'
-import { useRaceData, type ActiveView, type DataMode } from './store/useRaceData'
+import { useRaceData, type ActiveView, type DataMode, type SimLive } from './store/useRaceData'
 import { defaultConfig } from './api/openf1'
+
+// Dev rehearsal: ?simlive=<session_key>[&simspeed=N][&simstart=seconds] replays a
+// finished race as if it were live. See docs/proposals/simlive.md.
+function parseSimLive(): SimLive | null {
+  if (typeof window === 'undefined') return null
+  const p = new URLSearchParams(window.location.search)
+  const key = Number(p.get('simlive'))
+  if (!Number.isFinite(key) || key <= 0) return null
+  const speed = Math.max(1, Number(p.get('simspeed')) || 1)
+  const startRaw = p.get('simstart')
+  const startSec = startRaw != null ? Math.max(0, Number(startRaw) || 0) : 1500
+  return { key, speed, startSec }
+}
 
 const LS_KEY = 'f1buddy.state.v2'
 
@@ -75,10 +88,14 @@ export default function App() {
     return Number.isFinite(n) ? n : 'latest'
   }, [settings.sessionKey])
 
+  const simLive = useMemo(parseSimLive, [])
+
   const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
-    mode,
+    // simlive forces a live load of the chosen session, overriding Demo/Live.
+    mode: simLive ? 'live' : mode,
     config,
-    sessionKey,
+    sessionKey: simLive ? simLive.key : sessionKey,
+    simLive,
     lapWindow,
     activeView,
     reloadNonce,

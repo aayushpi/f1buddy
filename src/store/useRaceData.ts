@@ -23,6 +23,15 @@ export type ActiveView =
   | 'control'
   | 'weather'
 
+// Dev-only "simulated live": replay a finished session as if it were happening
+// now. See docs/proposals/simlive.md. `startSec` is how far into the race the
+// virtual clock begins; `speed` is how fast that virtual edge advances.
+export interface SimLive {
+  key: number
+  speed: number
+  startSec: number
+}
+
 export interface DataOptions {
   mode: DataMode
   config: OpenF1Config
@@ -30,6 +39,7 @@ export interface DataOptions {
   lapWindow: number
   activeView: ActiveView
   reloadNonce: number
+  simLive?: SimLive | null
 }
 
 export interface LapMarker {
@@ -147,7 +157,7 @@ const emptyRaw = (): RawData => ({
 const TELEMETRY_VIEWS: ActiveView[] = ['map', 'telemetry']
 
 export function useRaceData(opts: DataOptions): DataResult {
-  const { mode, config, sessionKey, lapWindow, activeView, reloadNonce } = opts
+  const { mode, config, sessionKey, lapWindow, activeView, reloadNonce, simLive } = opts
 
   const [snapshot, setSnapshot] = useState<RaceSnapshot | null>(null)
   const [connection, setConnection] = useState<Connection>('idle')
@@ -419,7 +429,9 @@ export function useRaceData(opts: DataOptions): DataResult {
         rawRef.current.session = session
 
         const endMs = Date.parse(session.date_end)
-        const isLive = Number.isFinite(endMs) ? Date.now() < endMs + LIVE_WINDOW_MS : true
+        const isLive = simLive
+          ? true
+          : Number.isFinite(endMs) ? Date.now() < endMs + LIVE_WINDOW_MS : true
         isLiveRef.current = isLive
 
         const [drivers, meetings] = await Promise.all([
@@ -441,9 +453,18 @@ export function useRaceData(opts: DataOptions): DataResult {
         const hasTimeline = bounds.max > bounds.min + 1000
         const raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
         markersRef.current = buildLapMarkers(rawRef.current)
+
+        // Simulated-live: a virtual "now" that advances in real time. tMax (the
+        // watchable edge) tracks it; raceEnd stays the *real* finish so the final
+        // classification can't leak when you reach the simulated edge.
+        const realMax = bounds.max
+        const mountedAt = Date.now()
+        const vnow = () =>
+          simLive ? bounds.min + simLive.startSec * 1000 + (Date.now() - mountedAt) * simLive.speed : realMax
+
         clock.current = {
           tMin: bounds.min,
-          tMax: bounds.max,
+          tMax: simLive ? Math.min(realMax, vnow()) : bounds.max,
           raceEnd,
           tNow: hasTimeline ? bounds.min : bounds.max, // start at the beginning
           playing: hasTimeline || isLive,
@@ -457,6 +478,14 @@ export function useRaceData(opts: DataOptions): DataResult {
 
         clockId = setInterval(() => {
           const c = clock.current
+          // Simulated-live: advance the watchable edge with the virtual clock.
+          if (simLive) {
+            const edge = Math.min(realMax, vnow())
+            if (edge !== c.tMax) {
+              c.tMax = edge
+              if (!c.playing && !follow.current) syncClock() // reflect a growing edge while paused/at start
+            }
+          }
           if (follow.current) {
             // Pinned to the live edge.
             if (c.tNow !== c.tMax) {
@@ -482,8 +511,10 @@ export function useRaceData(opts: DataOptions): DataResult {
           }
         }, CLOCK_INTERVAL)
 
-        // Keep an in-progress session's timeline growing.
-        if (isLive) liveId = setInterval(liveRefetch, LIVE_REFETCH_MS)
+        // Keep a real in-progress session's timeline growing via re-fetch.
+        // Simulated-live needs no network — all data is already loaded and the
+        // tick advances the edge locally.
+        if (isLive && !simLive) liveId = setInterval(liveRefetch, LIVE_REFETCH_MS)
       } catch (e) {
         if (!cancelled && !signal.aborted) {
           setError(e instanceof Error ? e.message : String(e))
@@ -499,7 +530,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       clearInterval(clockId)
       if (liveId) clearInterval(liveId)
     }
-  }, [mode, config, sessionKey, syncClock, reloadNonce])
+  }, [mode, config, sessionKey, syncClock, reloadNonce, simLive])
 
   const replay: ReplayControls | null = replayState
     ? { ...replayState, toggle, setSpeed, seek, goLive }
