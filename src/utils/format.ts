@@ -83,9 +83,55 @@ export function formatPlaces(value: number | null | undefined): string {
   return value > 0 ? `▲${value}` : `▼${Math.abs(value)}`
 }
 
+// Tokens that should stay upper-case when normalising race-control text.
+const RC_KEEP_UPPER = new Set(['drs', 'vsc', 'sc', 'fia', 'f1', 'tv', 'gps', 'kers', 'ers'])
+
+/**
+ * Race-control messages arrive SHOUTING IN ALL CAPS. Render them in sentence
+ * case so they're easier to read, while preserving the bits that are meant to
+ * stay upper-case: known acronyms (DRS, VSC…), driver codes in parentheses
+ * "(VER)", and position references like "P4".
+ */
+export function formatRaceMessage(raw: string | null | undefined): string {
+  if (!raw) return ''
+  let out = raw.toLowerCase()
+  // Re-upper standalone acronyms (before sentence-casing, so a leading acronym
+  // like "DRS ENABLED" isn't left as "Drs enabled").
+  out = out.replace(/\b[a-z0-9]+\b/g, (w) => (RC_KEEP_UPPER.has(w) ? w.toUpperCase() : w))
+  // Driver codes in parentheses, e.g. "(ver)" -> "(VER)".
+  out = out.replace(/\(([a-z]{2,3})\)/g, (_, c: string) => `(${c.toUpperCase()})`)
+  // Position references, e.g. "p4" -> "P4".
+  out = out.replace(/\bp(\d{1,2})\b/g, (_, n: string) => `P${n}`)
+  // Capitalise the first letter of the message (skip if it's already upper).
+  out = out.replace(/^([^a-zA-Z]*)([a-z])/, (_, pre: string, c: string) => pre + c.toUpperCase())
+  return out
+}
+
 /** Normalise a possibly-'#'-prefixed team colour into a CSS hex string. */
 export function teamHex(colour: string | null | undefined): string {
   if (!colour) return '#8a93a6'
   const c = colour.replace(/^#/, '').trim()
   return c.length === 6 ? `#${c}` : '#8a93a6'
+}
+
+/**
+ * Teammates share a colour, so distinguish them by line style: within each
+ * team the lower car number draws solid, the other dashed. Returns a map of
+ * driverNumber → SVG stroke-dasharray ('' = solid).
+ */
+export function teamLineDash(
+  drivers: { driverNumber: number; teamName: string }[],
+): Map<number, string> {
+  const byTeam = new Map<string, number[]>()
+  for (const d of drivers) {
+    const arr = byTeam.get(d.teamName) ?? []
+    arr.push(d.driverNumber)
+    byTeam.set(d.teamName, arr)
+  }
+  const out = new Map<number, string>()
+  for (const nums of byTeam.values()) {
+    nums.sort((a, b) => a - b)
+    nums.forEach((n, i) => out.set(n, i === 0 ? '' : '7 5'))
+  }
+  return out
 }

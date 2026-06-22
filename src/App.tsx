@@ -8,17 +8,20 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { TimingTower } from './components/TimingTower'
 import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
-import { RadioPopover } from './components/RadioPopover'
+import { NoticeStack } from './components/NoticeStack'
+import { LiveEntryChoice } from './components/LiveEntryChoice'
+import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
-import type { RadioClip } from './api/types'
 import { TrackMap } from './components/views/TrackMap'
+import { SpeedMap } from './components/views/SpeedMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
 import { RaceControlView } from './components/views/RaceControlView'
 import { WeatherView } from './components/views/WeatherView'
 import { useRaceData, type ActiveView, type DataMode } from './store/useRaceData'
+import { defaultConfig } from './api/openf1'
 
 const LS_KEY = 'f1buddy.state.v2'
 
@@ -32,7 +35,7 @@ interface Persisted {
 
 const DEFAULTS: Persisted = {
   mode: 'sim',
-  settings: { baseUrl: 'https://api.openf1.org/v1', apiKey: '', sessionKey: 'latest' },
+  settings: { baseUrl: defaultConfig.baseUrl, apiKey: '', sessionKey: 'latest' },
   lapWindow: 6,
   selected: [],
   activeView: 'timing',
@@ -57,9 +60,10 @@ export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
-  const [activeRadio, setActiveRadio] = useState<RadioClip | null>(null)
-  const lastRadioDate = useRef<string>('')
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
+  // Spoiler-safe entry prompt for in-progress races (start-from-beginning vs live).
+  const [liveChoiceOpen, setLiveChoiceOpen] = useState(false)
+  const livePromptKey = useRef<string | null>(null)
 
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
@@ -71,7 +75,7 @@ export default function App() {
     return Number.isFinite(n) ? n : 'latest'
   }, [settings.sessionKey])
 
-  const { snapshot, connection, error, replay, trackOutline } = useRaceData({
+  const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
     mode,
     config,
     sessionKey,
@@ -86,23 +90,31 @@ export default function App() {
     }
   }, [snapshot, selected.size])
 
-  // Reset radio tracking when the session changes so the popover doesn't carry
-  // a stale clip across races.
-  useEffect(() => {
-    lastRadioDate.current = ''
-    setActiveRadio(null)
-  }, [mode, sessionKey])
+  // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
+  // surfaced as a stacked, auto-dismissing popover. Reset per session.
+  const { notices, dismiss } = useRaceNotices(snapshot, `${mode}:${String(sessionKey)}`)
 
-  // Surface each newly-arrived team-radio clip as a popover (newest first).
+  // When an in-progress race finishes loading, ask once how to start it. Default
+  // is spoiler-free (the engine already begins at lights-out); jumping to live
+  // is an explicit, separated choice. Keyed per load so it only asks once.
+  const loadId = `${mode}:${String(sessionKey)}:${reloadNonce}`
+  const isLive = replay?.live ?? false
+  const ready = !!snapshot && snapshot.drivers.length > 0
   useEffect(() => {
-    const radios = snapshot?.radios
-    if (!radios?.length) return
-    const newest = radios[0]
-    if (newest.date > lastRadioDate.current) {
-      lastRadioDate.current = newest.date
-      setActiveRadio(newest)
+    if (isLive && ready && livePromptKey.current !== loadId) {
+      livePromptKey.current = loadId
+      setLiveChoiceOpen(true)
     }
-  }, [snapshot?.radios])
+  }, [isLive, ready, loadId])
+
+  const watchFromStart = () => {
+    replay?.seek(replay.tMin) // guarantee the very beginning, however long the prompt was up
+    setLiveChoiceOpen(false)
+  }
+  const jumpToLive = () => {
+    replay?.goLive()
+    setLiveChoiceOpen(false)
+  }
 
   useEffect(() => {
     const data: Persisted = { mode, settings, lapWindow, selected: [...selected], activeView }
@@ -160,10 +172,6 @@ export default function App() {
                       ? 'Connecting to the timing feed…'
                       : 'Waiting for session data…'}
                 </div>
-                <div style={{ maxWidth: 460, lineHeight: 1.5 }}>
-                  A full race is a large download and can take a few seconds. Demo mode is the
-                  offline simulator — you don’t need it to watch real data.
-                </div>
               </>
             )}
           </div>
@@ -208,6 +216,12 @@ export default function App() {
         return (
           <div className="viewbody">
             <TrackMap cars={snapshot.trackMap} outline={trackOutline} showSimOutline={mode === 'sim'} />
+          </div>
+        )
+      case 'speedmap':
+        return (
+          <div className="viewbody">
+            <SpeedMap channels={trackChannels} />
           </div>
         )
       case 'gap':
@@ -267,13 +281,8 @@ export default function App() {
 
       <Header
         snapshot={snapshot}
-        mode={mode}
-        onMode={setMode}
         connection={connection}
         onSettings={() => setSettingsOpen(true)}
-        config={config}
-        sessionKey={sessionKey}
-        onLoadSession={loadSession}
       />
 
       <ViewTabs active={activeView} onChange={setActiveView} />
@@ -286,22 +295,36 @@ export default function App() {
 
       <Ticker race={snapshot?.race} />
 
-      <AnimatePresence>
-        {activeRadio && (
-          <RadioPopover
-            key={activeRadio.date}
-            radio={activeRadio}
-            onClose={() => setActiveRadio(null)}
-          />
-        )}
-      </AnimatePresence>
+      <NoticeStack notices={notices} onDismiss={dismiss} />
 
       <SettingsDrawer
         open={settingsOpen}
         settings={settings}
         onClose={() => setSettingsOpen(false)}
         onApply={setSettings}
+        mode={mode}
+        onMode={setMode}
+        config={config}
+        sessionKey={sessionKey}
+        activeLabel={
+          mode === 'live' && typeof sessionKey === 'number' && snapshot?.race
+            ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
+            : null
+        }
+        onLoadSession={loadSession}
       />
+
+      {liveChoiceOpen && replay?.live && (
+        <LiveEntryChoice
+          label={
+            snapshot?.race
+              ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
+              : null
+          }
+          onWatchFromStart={watchFromStart}
+          onJumpToLive={jumpToLive}
+        />
+      )}
     </div>
   )
 }

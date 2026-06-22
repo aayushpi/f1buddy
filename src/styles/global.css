@@ -228,6 +228,12 @@ button {
 .status-text { display: flex; flex-direction: column; }
 .status-text .label { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; }
 .status-text .sub { font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+/* Lap count merged into the status pill, divided off to its right. */
+.status-lap {
+  display: flex; flex-direction: column;
+  margin-left: 6px; padding-left: 16px;
+  border-left: 1px solid var(--border-strong);
+}
 
 /* Mode + settings controls */
 .controls { display: flex; align-items: center; gap: 8px; padding: 10px; }
@@ -500,29 +506,19 @@ button {
   padding: 9px 16px;
   font-size: 12px;
 }
-.ticker .tag {
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--bg-0);
-  background: var(--accent);
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-weight: 800;
-  flex: 0 0 auto;
-}
-.ticker .msg { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ticker .weather { margin-left: auto; display: flex; gap: 16px; color: var(--muted); flex: 0 0 auto; }
 .ticker .weather b { color: var(--text-dim); font-family: var(--mono); font-weight: 600; }
 
 /* ============================ Settings drawer ============================ */
-.scrim {
+/* Scoped under .app so they beat the `.app > * { position: relative }` rule
+   below and stay true viewport overlays rather than in-flow children. */
+.app > .scrim {
   position: fixed; inset: 0;
   background: rgba(2, 4, 9, 0.6);
   backdrop-filter: blur(3px);
   z-index: 40;
 }
-.drawer {
+.app > .drawer {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: min(420px, 92vw);
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
@@ -712,6 +708,47 @@ button {
 .tcard-trace { margin-top: auto; }
 .trace-lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 
+/* Multi-channel telemetry traces */
+.tch-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.tch { display: flex; flex-direction: column; gap: 1px; }
+.tch-lbl { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.teammate-tag { color: var(--muted); font-weight: 900; font-size: 15px; line-height: 1; }
+
+/* Speed comparison overlay */
+.speed-overlay { padding: 0 14px 6px; flex: 0 0 auto; }
+.speed-overlay .trace-lbl { display: block; margin-bottom: 4px; }
+.speed-overlay-svg { width: 100%; height: 64px; display: block; }
+.chip.teammate .swatch { background: none; border: 1.5px dashed var(--team); }
+
+/* Speed map legend + toggle */
+.sm-toggle { flex: 0 0 auto; }
+.sm-legend {
+  position: absolute;
+  left: 18px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 36px);
+  background: rgba(5, 7, 13, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  backdrop-filter: blur(6px);
+}
+.sm-l { font-family: var(--mono); color: var(--muted); }
+.sm-bar {
+  width: 150px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, hsl(240 92% 55%), hsl(180 92% 55%), hsl(120 92% 55%), hsl(60 92% 55%), hsl(0 92% 55%));
+}
+.sm-key { display: flex; align-items: center; gap: 5px; font-family: var(--mono); }
+.sm-key .sw { width: 13px; height: 8px; border-radius: 2px; }
+
 /* ============================ Strategy ============================ */
 .strategy { flex: 1 1 auto; display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; min-height: 0; }
 .strat-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -879,6 +916,22 @@ button {
 .sp-note.err { color: var(--amber); }
 .sp-spin { width: 22px; height: 22px; border-width: 2px; }
 
+/* Inside the Settings drawer the picker flows in-place (single column) instead
+   of as a floating dropdown — a 560px two-column popover can't fit, and an
+   absolutely-positioned panel gets clipped by the drawer's scroll box. */
+.drawer .session-browser { display: block; width: 100%; }
+.drawer .session-btn { width: 100%; justify-content: center; }
+.drawer .session-pop {
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin-top: 8px;
+  box-shadow: none;
+  border-color: var(--border);
+}
+.drawer .sp-cols { grid-template-columns: 1fr; }
+.drawer .sp-list { height: 190px; }
+
 /* Keep the header (and its Sessions dropdown) above the views below it. */
 .header { position: relative; z-index: 30; }
 .session-browser { display: flex; align-items: center; }
@@ -987,6 +1040,34 @@ button {
 }
 
 .replay-speeds button { padding: 6px 9px; font-size: 10px; }
+
+/* Broadcast-style "go live" button: grey when you're behind (click to catch up),
+   red and pulsing when you're riding the live edge. */
+.live-btn {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.live-btn:not(:disabled):hover { border-color: var(--red); color: var(--text); }
+.live-btn .live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+}
+.live-btn.on {
+  border-color: color-mix(in srgb, var(--red) 60%, transparent);
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+  color: var(--text);
+  cursor: default;
+}
+.live-btn.on .live-dot { background: var(--red); box-shadow: 0 0 8px var(--red); animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* ---- Session browser: step indicator + Race emphasis ---- */
 .sp-steps {
@@ -1103,6 +1184,20 @@ button {
 .df-acr { font-weight: 800; font-size: 13px; }
 .df-acr.muted { color: var(--muted); }
 
+/* Focused driver's tyre + pit stops, parked directly under the name. */
+.focus-meta {
+  flex: 0 0 auto;
+  display: flex; gap: 22px; align-items: center;
+  padding: 0 16px 12px;
+}
+.focus-meta .fm-item { display: flex; flex-direction: column; gap: 4px; }
+.focus-meta .fm-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.focus-meta .fm-value { font-size: 18px; font-weight: 800; }
+
+/* Neighbour tyre + stop count carried inside the ahead/behind buttons. */
+.focus-gap .fg-extra { display: flex; align-items: center; gap: 7px; }
+.focus-gap .fg-pit { font-size: 11px; color: var(--muted); }
+
 /* Compact neighbour comparison, parked below the lap table. */
 .focus-grid { flex: 0 0 auto; padding: 4px 12px 10px; border-top: 1px solid var(--border); }
 .focus-col.head, .focus-row {
@@ -1217,24 +1312,89 @@ button {
 .lh-empty { padding: 18px 6px; font-size: 12px; color: var(--muted); }
 
 /* ============================ Team-radio popover ============================ */
-.radio-pop {
+/* Live-entry choice: deliberately separated so a mis-tap can't reveal results.
+   The safe "watch from start" is the big primary; "jump to live" sits apart
+   below a divider, red-outlined, with a spoiler warning. */
+.app > .live-choice {
+  position: fixed;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 42;
+  width: min(440px, 92vw);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+  padding: 22px;
+  text-align: center;
+}
+.lc-kicker { font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); }
+.lc-title { margin: 8px 0 2px; font-size: 18px; letter-spacing: 0.02em; }
+.lc-sub { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+.lc-btn {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.12s, box-shadow 0.15s, border-color 0.15s, background 0.15s;
+}
+.lc-btn:hover { transform: translateY(-1px); }
+.lc-btn .lc-btn-title { font-size: 15px; font-weight: 800; letter-spacing: 0.02em; }
+.lc-btn .lc-btn-sub { font-size: 11.5px; opacity: 0.85; }
+/* Safe, prominent default. */
+.lc-btn.safe {
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 22px var(--accent-glow);
+}
+.lc-btn.safe:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+/* Clear separation between the two outcomes. */
+.lc-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 2px;
+  color: var(--muted); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+}
+.lc-divider::before, .lc-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
+/* Spoiler path: distinct, warning-styled, secondary. */
+.lc-btn.danger {
+  border: 1px solid color-mix(in srgb, var(--red) 55%, var(--border-strong));
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--text-dim);
+}
+.lc-btn.danger .lc-btn-title { color: var(--red); }
+.lc-btn.danger:hover { border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+/* Stacked, auto-dismissing alerts (fastest lap/sector, race control, radio).
+   Newest at the bottom; the column grows upward from the bottom-right corner. */
+.notice-stack {
   position: fixed;
   bottom: 64px;
   right: 16px;
   z-index: 38;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 280px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+.notice {
+  position: relative;
+  pointer-events: auto;
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border: 1px solid var(--border-strong);
   border-left: 3px solid var(--team, var(--accent));
   border-radius: var(--radius);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
-  padding: 14px 16px 0;
-  cursor: pointer;
+  padding: 12px 16px 0;
   overflow: hidden;
 }
-.radio-close {
+.notice-close {
   position: absolute;
-  top: 8px; right: 8px;
+  top: 6px; right: 6px;
   background: transparent;
   border: 0;
   color: var(--muted);
@@ -1242,31 +1402,166 @@ button {
   width: 22px; height: 22px;
   display: grid; place-items: center;
   border-radius: 6px;
+  cursor: pointer;
 }
-.radio-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-.radio-head { display: flex; align-items: baseline; gap: 8px; }
-.radio-kicker { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
-.radio-acr { font-size: 16px; font-weight: 800; }
-.radio-body { display: flex; align-items: center; gap: 12px; padding: 12px 0 14px; }
-.radio-play {
+.notice-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.notice-kicker { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.notice-kicker.fl { color: var(--purple); }
+.notice-line { display: flex; align-items: baseline; gap: 8px; }
+.notice-acr { font-size: 16px; font-weight: 800; }
+.notice-time { margin-left: auto; font-size: 14px; font-weight: 700; }
+.notice-msg { display: block; font-size: 13px; color: var(--text-dim); line-height: 1.35; padding-right: 16px; }
+
+/* Spacing per kind. */
+.notice-control { padding-bottom: 12px; }
+.notice-fastlap, .notice-fastsector { padding-bottom: 12px; }
+.notice-fastlap .notice-line, .notice-fastsector .notice-line { margin-top: 6px; }
+
+/* Race-control flag accent on the left bar. */
+.notice.flag-green { border-left-color: var(--green); }
+.notice.flag-yellow { border-left-color: var(--yellow); }
+.notice.flag-red { border-left-color: var(--red); }
+.notice.flag-blue { border-left-color: #2f8fff; }
+.notice.flag-chequered { border-left-color: var(--text); }
+
+/* Radio: play control. */
+.notice-radio .notice-play {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  margin: 10px 0 12px;
+  padding: 0;
+  background: transparent; border: 0; color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+}
+.notice-radio .np-icon {
   flex: 0 0 auto;
-  width: 38px; height: 38px;
+  width: 34px; height: 34px;
   border-radius: 50%;
   border: 1px solid var(--team, var(--accent));
   background: color-mix(in srgb, var(--team) 18%, transparent);
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   display: grid; place-items: center;
 }
-.radio-play.on { background: var(--team, var(--accent)); color: #05070d; }
-.radio-msg { font-size: 13px; color: var(--text-dim); }
-.radio-countdown { height: 3px; margin: 0 -16px; background: rgba(255,255,255,0.06); }
-.radio-countdown-bar {
+.notice-radio .notice-play.on .np-icon { background: var(--team, var(--accent)); color: #05070d; }
+
+.notice-countdown { height: 3px; margin: 0 -16px; background: rgba(255,255,255,0.06); }
+.notice-countdown-bar {
   display: block;
   height: 100%;
   width: 100%;
   background: var(--team, var(--accent));
   transform-origin: left center;
-  animation: radio-drain linear forwards;
+  animation: notice-drain linear forwards;
 }
-@keyframes radio-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes notice-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* ============================================================
+   Phone view (≤640px)
+   The dashboard is built for iPad landscape; on a phone we keep
+   the same fixed-height shell but reflow every multi-column grid
+   into a single, touch-friendly column.
+   ============================================================ */
+@media (max-width: 640px) {
+  .app { padding: 8px; gap: 8px; }
+  .panel-title { padding: 10px 12px; font-size: 10px; }
+  .mobile-hide { display: none !important; }
+
+  /* ---- Header: two compact rows ---- */
+  .header { flex-wrap: wrap; gap: 8px; }
+  .header-spacer { display: none; }
+  .header-block.brand { display: none; }
+  .header-block { padding: 8px 12px; }
+  .status-pill { min-width: 0; flex: 1 1 auto; padding: 8px 12px; gap: 10px; order: 0; }
+  .status-pill .light { width: 13px; height: 13px; }
+  .status-text .label { font-size: 14px; }
+  .header > .header-block { order: 1; }
+  .value-lg { font-size: 18px; }
+  .controls { order: 2; padding: 6px 8px; }
+  .seg button { padding: 6px 11px; }
+  .session-browser { order: 3; flex: 1 1 100%; }
+  .session-btn { width: 100%; justify-content: center; height: 38px; }
+
+  /* ---- View tabs: horizontal scroll, no wrap ---- */
+  .viewtabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .viewtabs::-webkit-scrollbar { display: none; }
+  .viewtab { flex: 0 0 auto; padding: 8px 13px; font-size: 11px; }
+
+  /* ---- Replay bar: scrubber drops to its own row ---- */
+  .replaybar { flex-wrap: wrap; gap: 10px 14px; padding: 8px 10px; }
+  .replay-scrub { order: 5; flex: 1 1 100%; }
+
+  /* ---- Ticker: just the message; weather lives in its own view ---- */
+  /* Weather-only footer is non-essential on a phone; reclaim the space. */
+  .ticker { display: none; }
+
+  /* ---- Timing: stack tower over analysis ---- */
+  .body { display: flex; flex-direction: column; gap: 8px; }
+  .body > .col { flex: 1 1 0; min-height: 0; }
+  .body > .col:first-child { flex: 1.6 1 0; }
+
+  /* Timing tower: keep P · Driver · Tyre · Last · Leader; drop the rest */
+  .tower-head,
+  .tower-row {
+    grid-template-columns: 20px 1fr 54px 58px 52px;
+    gap: 4px;
+    padding: 0 10px;
+  }
+  .tower-head > :nth-child(4),
+  .tower-head > :nth-child(5),
+  .tower-head > :nth-child(7),
+  .tower-head > :nth-child(9),
+  .tower-row > :nth-child(4),
+  .tower-row > :nth-child(5),
+  .tower-row > :nth-child(7),
+  .tower-row > :nth-child(9) { display: none; }
+  .tower-row { height: 46px; }
+  .driver-acr { font-size: 14px; }
+  .driver-name { font-size: 10px; }
+  .pos { font-size: 14px; }
+
+  /* Driver focus becomes a full-screen overlay */
+  .focus-panel {
+    position: fixed;
+    inset: 8px;
+    z-index: 45;
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid color-mix(in srgb, var(--team) 60%, var(--border-strong));
+    background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+
+  /* ---- Telemetry: one card per row ---- */
+  .tcards { grid-template-columns: 1fr; }
+
+  /* ---- Strategy & Race Control: stack panels, view scrolls ---- */
+  .strategy,
+  .control-view {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 8px;
+  }
+  .strat-side,
+  .control-side { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
+  .strat-gantt,
+  .strat-pits,
+  .strat-grid,
+  .rc-log,
+  .rc-overtakes,
+  .rc-radio { flex: 0 0 auto; }
+  .gantt-body,
+  .strat-scroll { max-height: 44vh; }
+
+  /* ---- Weather: 2-up stats, single-column trends, view scrolls ---- */
+  .weatherview { overflow-y: auto; }
+  .wx-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px 10px 10px; }
+  .wx-stat { padding: 12px; }
+  .wx-value { font-size: 24px; }
+  .wx-trends { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 8px; padding: 0 10px 10px; flex: 0 0 auto; }
+
+  /* ---- Gap chart: tighter header ---- */
+  .gap-header { flex-direction: column; gap: 8px; padding: 12px 14px 4px; }
+  .gap-title { font-size: 17px; }
+}

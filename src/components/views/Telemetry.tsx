@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { DriverState, TelemetryTrace } from '../../api/types'
-import { teamHex } from '../../utils/format'
+import { teamHex, teamLineDash } from '../../utils/format'
 import { MiniLine } from '../MiniLine'
 
 interface Props {
@@ -10,17 +10,62 @@ interface Props {
   onToggle: (n: number) => void
 }
 
-const DRS_LABEL: Record<string, string> = { on: 'DRS', eligible: 'DRS', off: 'DRS' }
+interface Channel {
+  key: 'speed' | 'throttle' | 'brake' | 'gear' | 'rpm'
+  label: string
+  colour: string
+  min: number
+  max: number
+  fill: boolean
+}
 
-function Bar({ value, max, colour }: { value: number; max: number; colour: string }) {
+const CHANNELS: Channel[] = [
+  { key: 'speed', label: 'Speed', colour: 'var(--accent)', min: 50, max: 340, fill: true },
+  { key: 'throttle', label: 'Throttle', colour: 'var(--green)', min: 0, max: 100, fill: true },
+  { key: 'brake', label: 'Brake', colour: 'var(--red)', min: 0, max: 100, fill: true },
+  { key: 'gear', label: 'Gear', colour: 'var(--accent-2)', min: 0, max: 8, fill: false },
+  { key: 'rpm', label: 'RPM', colour: '#ff9d2f', min: 0, max: 13000, fill: false },
+]
+
+/** Overlay of every selected driver's speed trace for direct comparison. */
+function SpeedOverlay({
+  traces,
+  dash,
+}: {
+  traces: { num: number; colour: string; speed: number[] }[]
+  dash: Map<number, string>
+}) {
+  const W = 100
+  const H = 32
+  const lo = 50
+  const hi = 340
+  const span = hi - lo
+  const path = (vals: number[]) => {
+    if (vals.length < 2) return ''
+    const step = W / (vals.length - 1)
+    return vals
+      .map((v, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)},${(H - ((v - lo) / span) * H).toFixed(1)}`)
+      .join(' ')
+  }
   return (
-    <div className="tbar">
-      <div className="tbar-fill" style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: colour }} />
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="speed-overlay-svg">
+      {traces.map((t) => (
+        <path
+          key={t.num}
+          d={path(t.speed)}
+          fill="none"
+          stroke={t.colour}
+          strokeWidth={1.8}
+          strokeDasharray={dash.get(t.num) || undefined}
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </svg>
   )
 }
 
-function Card({ d, trace }: { d: DriverState; trace?: TelemetryTrace }) {
+function Card({ d, trace, dash }: { d: DriverState; trace?: TelemetryTrace; dash: string }) {
   const hex = teamHex(d.teamColour)
   const c = d.car
   return (
@@ -29,8 +74,9 @@ function Card({ d, trace }: { d: DriverState; trace?: TelemetryTrace }) {
         <span className="acr" style={{ color: hex }}>
           {d.acronym}
         </span>
+        {dash && <span className="teammate-tag" title="Second car of the team (dashed)">╌</span>}
         <span className="pos mono">P{d.position ?? '–'}</span>
-        <span className={`drs-pill ${c?.drs ?? 'off'}`}>{DRS_LABEL[c?.drs ?? 'off']}</span>
+        <span className={`drs-pill ${c?.drs ?? 'off'}`}>DRS</span>
       </div>
 
       <div className="tcard-main">
@@ -44,25 +90,13 @@ function Card({ d, trace }: { d: DriverState; trace?: TelemetryTrace }) {
         </div>
       </div>
 
-      <div className="tgauge">
-        <span className="lbl">RPM</span>
-        <Bar value={c?.rpm ?? 0} max={12000} colour="var(--accent-2)" />
-        <span className="val mono">{c ? Math.round(c.rpm) : '—'}</span>
-      </div>
-      <div className="tgauge">
-        <span className="lbl">THR</span>
-        <Bar value={c?.throttle ?? 0} max={100} colour="var(--green)" />
-        <span className="val mono">{c ? Math.round(c.throttle) : '—'}%</span>
-      </div>
-      <div className="tgauge">
-        <span className="lbl">BRK</span>
-        <Bar value={c?.brake ?? 0} max={100} colour="var(--red)" />
-        <span className="val mono">{c ? Math.round(c.brake) : '—'}%</span>
-      </div>
-
-      <div className="tcard-trace">
-        <span className="trace-lbl">Speed trace</span>
-        <MiniLine values={trace?.speed ?? []} colour={hex} height={56} min={50} max={340} fill />
+      <div className="tch-stack">
+        {CHANNELS.map((ch) => (
+          <div className="tch" key={ch.key}>
+            <span className="tch-lbl">{ch.label}</span>
+            <MiniLine values={trace?.[ch.key] ?? []} colour={ch.colour} height={34} min={ch.min} max={ch.max} fill={ch.fill} />
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -75,23 +109,24 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
     return m
   }, [telemetry])
 
+  const dash = useMemo(() => teamLineDash(drivers), [drivers])
   const shown = drivers.filter((d) => selected.has(d.driverNumber)).slice(0, 4)
+  const overlay = shown
+    .map((d) => ({ num: d.driverNumber, colour: teamHex(d.teamColour), speed: traceMap.get(d.driverNumber)?.speed ?? [] }))
+    .filter((t) => t.speed.length > 1)
 
   return (
     <div className="panel telemetry">
       <div className="panel-title">
         <span className="dot" />
         Car Telemetry
-        <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.1em' }}>
-          SPEED · RPM · GEAR · THROTTLE · BRAKE · DRS
-        </span>
       </div>
 
       <div className="driver-chips" style={{ maxHeight: 80 }}>
         {drivers.map((d) => (
           <button
             key={d.driverNumber}
-            className={`chip ${selected.has(d.driverNumber) ? 'on' : ''}`}
+            className={`chip ${selected.has(d.driverNumber) ? 'on' : ''} ${dash.get(d.driverNumber) ? 'teammate' : ''}`}
             style={{ ['--team' as string]: teamHex(d.teamColour) }}
             onClick={() => onToggle(d.driverNumber)}
           >
@@ -102,13 +137,21 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
       </div>
 
       {shown.length ? (
-        <div className="tcards">
-          {shown.map((d) => (
-            <Card key={d.driverNumber} d={d} trace={traceMap.get(d.driverNumber)} />
-          ))}
-        </div>
+        <>
+          {overlay.length > 1 && (
+            <div className="speed-overlay">
+              <span className="trace-lbl">Speed comparison · {overlay.length} cars</span>
+              <SpeedOverlay traces={overlay} dash={dash} />
+            </div>
+          )}
+          <div className="tcards">
+            {shown.map((d) => (
+              <Card key={d.driverNumber} d={d} trace={traceMap.get(d.driverNumber)} dash={dash.get(d.driverNumber) ?? ''} />
+            ))}
+          </div>
+        </>
       ) : (
-        <div className="chart-empty">Select up to four drivers to inspect live car telemetry.</div>
+        <div className="chart-empty">Select up to four drivers.</div>
       )}
     </div>
   )

@@ -1,12 +1,13 @@
 import type { RaceState } from '../api/types'
 
+// A slim footer carrying just the at-a-glance weather. Race-control messages
+// are no longer pinned here — they flash up as auto-dismissing popovers (see
+// NoticeStack) and the full log lives in the Race Control tab.
 export function Ticker({ race }: { race: RaceState | undefined }) {
-  if (!race) return null
-  const w = race.weather
+  const w = race?.weather
+  if (!w) return null
   return (
     <div className="panel ticker">
-      <span className="tag">Race Control</span>
-      <span className="msg">{race.lastMessage ?? 'No messages yet.'}</span>
       {w && (
         <span className="weather">
           {w.track_temperature != null && (

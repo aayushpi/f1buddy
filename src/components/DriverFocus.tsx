@@ -105,7 +105,21 @@ export function DriverFocus({ drivers, focused, onClose }: Props) {
         <span className="focus-team">{focus.teamName}</span>
       </div>
 
-      {/* Tap a neighbour to compare sector times against it. */}
+      {/* The focused driver's tyre + pit stops sit right under the name — the
+          first things you want when you tap into a car. */}
+      <div className="focus-meta">
+        <div className="fm-item">
+          <span className="fm-label">Tyre</span>
+          <TyreBadge compound={focus.compound} age={focus.tyreAge} />
+        </div>
+        <div className="fm-item">
+          <span className="fm-label">Pit stops</span>
+          <span className="fm-value mono">{focus.pitStops}</span>
+        </div>
+      </div>
+
+      {/* Tap a neighbour to compare sector times against it. Each side also
+          carries that car's tyre + stop count for an at-a-glance strategy read. */}
       <div className="focus-gaps">
         <button
           className={`focus-gap ${refSide === 'ahead' ? 'selected' : ''}`}
@@ -114,6 +128,12 @@ export function DriverFocus({ drivers, focused, onClose }: Props) {
         >
           <span className="lbl">▲ Ahead {acrTag(ahead)}</span>
           <span className="val mono">{ahead ? formatGap(focus.interval) : '—'}</span>
+          {ahead && (
+            <span className="fg-extra">
+              <TyreBadge compound={ahead.compound} age={ahead.tyreAge} />
+              <span className="fg-pit mono">{ahead.pitStops} stop{ahead.pitStops === 1 ? '' : 's'}</span>
+            </span>
+          )}
         </button>
         <button
           className={`focus-gap ${refSide === 'behind' ? 'selected' : ''}`}
@@ -122,6 +142,12 @@ export function DriverFocus({ drivers, focused, onClose }: Props) {
         >
           <span className="lbl">▼ Behind {acrTag(behind)}</span>
           <span className="val mono">{behind ? formatGap(behind.interval) : '—'}</span>
+          {behind && (
+            <span className="fg-extra">
+              <TyreBadge compound={behind.compound} age={behind.tyreAge} />
+              <span className="fg-pit mono">{behind.pitStops} stop{behind.pitStops === 1 ? '' : 's'}</span>
+            </span>
+          )}
         </button>
       </div>
 
@@ -155,29 +181,6 @@ export function DriverFocus({ drivers, focused, onClose }: Props) {
               </div>
             )
           })}
-        </div>
-      </div>
-
-      {/* Compact comparison vs the cars ahead and behind. */}
-      <div className="focus-grid">
-        <div className="focus-col head">
-          <span className="ch ahead">{acrTag(ahead)}</span>
-          <span className="ch focus">{acrTag(focus)}</span>
-          <span className="ch behind">{acrTag(behind)}</span>
-        </div>
-
-        <div className="focus-row">
-          <span className="rl">Tyre</span>
-          <div className="rc">{ahead ? <TyreBadge compound={ahead.compound} age={ahead.tyreAge} /> : '—'}</div>
-          <div className="rc on"><TyreBadge compound={focus.compound} age={focus.tyreAge} /></div>
-          <div className="rc">{behind ? <TyreBadge compound={behind.compound} age={behind.tyreAge} /> : '—'}</div>
-        </div>
-
-        <div className="focus-row">
-          <span className="rl">Pit stops</span>
-          <span className="rc mono">{ahead ? ahead.pitStops : '—'}</span>
-          <span className="rc mono on">{focus.pitStops}</span>
-          <span className="rc mono">{behind ? behind.pitStops : '—'}</span>
         </div>
       </div>
     </motion.div>

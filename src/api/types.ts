@@ -276,6 +276,16 @@ export interface TrackMapCar {
   inPit: boolean
 }
 
+// A point along the circuit enriched with telemetry channels, for painting the
+// track by speed / gear / DRS.
+export interface ChannelPoint {
+  x: number
+  y: number
+  speed: number // km/h
+  gear: number
+  drs: boolean
+}
+
 export interface StintSegment {
   compound: string | null
   lapStart: number

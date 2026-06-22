@@ -17,9 +17,12 @@ import type {
   ApiWeather,
 } from './types'
 
-// Base URL for the OpenF1 REST API. Configurable so a user with a real-time
-// subscription can point at an authenticated proxy if they have one.
-const DEFAULT_BASE = 'https://api.openf1.org/v1'
+// Base URL for the OpenF1 REST API. Defaults to OpenF1 directly, but set
+// VITE_OPENF1_BASE_URL (e.g. http://localhost:8787/v1) to route through the
+// caching proxy in server/proxy.mjs — that keeps the API key server-side and
+// lets one key serve many simultaneous viewers.
+const ENV_BASE = (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_OPENF1_BASE_URL
+const DEFAULT_BASE = ENV_BASE && ENV_BASE.trim() ? ENV_BASE.trim() : 'https://api.openf1.org/v1'
 
 export interface OpenF1Config {
   baseUrl: string
