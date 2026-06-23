@@ -1618,7 +1618,7 @@ button {
 
 .ps-body { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding: 4px 0 6px; }
 .ps-row {
-  height: 40px;
+  height: 50px;
   border-bottom: 1px solid rgba(120, 160, 255, 0.05);
   border-left: 3px solid transparent;
 }
@@ -1626,8 +1626,28 @@ button {
 
 .ps-pos { font-family: var(--mono); font-weight: 800; font-size: 14px; text-align: center; color: var(--text-dim); }
 .ps-driver { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ps-driver.col1 { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; }
+.ps-driver-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
 .ps-acr { font-weight: 800; font-size: 14px; }
 .ps-team { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ps-tyres { display: flex; align-items: center; gap: 5px; }
+.ps-tyre {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: #05070d;
+  background: var(--tyre);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.ps-tyre.empty { background: transparent; color: var(--muted); border-color: transparent; }
+.ps-stops { font-size: 10px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.04em; margin-left: 2px; }
 
 .ps-gap { text-align: center; font-size: 13px; color: var(--text-dim); }
 .ps-gap.clear-air { color: var(--green); font-weight: 700; }

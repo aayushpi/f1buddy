@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import type { DriverState } from '../../api/types'
+import type { DriverState, StintRow } from '../../api/types'
 import type { PitLoss } from '../../data/pitTimes'
-import { teamHex } from '../../utils/format'
+import { compoundColor, compoundLabel, teamHex } from '../../utils/format'
 
 // Gaps at or above this are "clear air" — painted green.
 const CLEAR_AIR = 5
@@ -13,6 +13,7 @@ const PIT_LABEL: Record<PitType, string> = { green: 'PIT', vsc: 'VSC PIT', sc: '
 
 interface Props {
   drivers: DriverState[]
+  stints: StintRow[]
   pitLoss: PitLoss
   circuit: string
 }
@@ -61,9 +62,46 @@ function GapCell({ value, label }: { value: number | null; label?: string }) {
   )
 }
 
-export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
+// The ordered list of compounds a driver has run, from the stint feed.
+function TyreStrip({ compounds, stops }: { compounds: string[]; stops: number }) {
+  return (
+    <div className="ps-tyres">
+      {compounds.length ? (
+        compounds.map((c, i) => (
+          <span
+            key={i}
+            className="ps-tyre"
+            style={{ ['--tyre' as string]: compoundColor(c) }}
+            title={c ?? 'Unknown compound'}
+          >
+            {compoundLabel(c)}
+          </span>
+        ))
+      ) : (
+        <span className="ps-tyre empty">—</span>
+      )}
+      <span className="ps-stops" title="Completed pit stops">
+        {stops} {stops === 1 ? 'stop' : 'stops'}
+      </span>
+    </div>
+  )
+}
+
+export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
   // driverNumber -> the kind of stop being simulated for that car.
   const [pits, setPits] = useState<Map<number, PitType>>(new Map())
+
+  // driverNumber -> ordered compounds run this race (oldest stint first).
+  const tyresByDriver = useMemo(() => {
+    const m = new Map<number, string[]>()
+    for (const row of stints) {
+      const seq = [...row.segments]
+        .sort((a, b) => a.lapStart - b.lapStart)
+        .map((s) => s.compound ?? '?')
+      m.set(row.driverNumber, seq)
+    }
+    return m
+  }, [stints])
 
   const setPit = (num: number, type: PitType) =>
     setPits((prev) => {
@@ -254,11 +292,14 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
                     style={{ ['--team' as string]: team }}
                   >
                     <div className="ps-pos">{d.position ?? '–'}</div>
-                    <div className="ps-driver">
-                      <span className="ps-acr" style={{ color: team }}>
-                        {d.acronym}
-                      </span>
-                      <span className="ps-team">{d.teamName}</span>
+                    <div className="ps-driver col1">
+                      <div className="ps-driver-top">
+                        <span className="ps-acr" style={{ color: team }}>
+                          {d.acronym}
+                        </span>
+                        <span className="ps-team">{d.teamName}</span>
+                      </div>
+                      <TyreStrip compounds={tyresByDriver.get(d.driverNumber) ?? []} stops={d.pitStops} />
                     </div>
                     <GapCell value={d.isLeader ? null : interval} label={d.isLeader ? '—' : undefined} />
                     <GapCell value={d.isLeader ? null : leader} label={d.isLeader ? 'LEADER' : undefined} />

@@ -280,6 +280,7 @@ export default function App() {
           <div className="viewbody">
             <PitSimulator
               drivers={snapshot.drivers}
+              stints={snapshot.stints}
               pitLoss={pitLossFor(snapshot.race.circuit, snapshot.race.countryName, snapshot.race.meetingName)}
               circuit={snapshot.race.meetingName || snapshot.race.circuit}
             />
