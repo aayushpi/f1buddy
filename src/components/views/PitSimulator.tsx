@@ -113,48 +113,53 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
 
   const clearAll = () => setPits(new Map())
 
-  // Live order (column one) — drivers arrive already sorted by position.
+  // Live order (column one) — drivers arrive already sorted by position. This
+  // order is the single source of truth: column two is built from it, so with
+  // no stop simulated it mirrors column one exactly and never drifts on its own
+  // as the live gap figures jitter between polls.
   const live = drivers
-  const livePos = useMemo(() => {
-    const m = new Map<number, number>()
-    live.forEach((d, i) => m.set(d.driverNumber, d.position ?? i + 1))
-    return m
-  }, [live])
 
-  // Projected order (column two): add the chosen pit loss to each pitting
-  // driver's race time and re-sort.
+  // Projected order (column two). We anchor each car's race time to the LIVE
+  // order (forced strictly increasing so a sort can't reshuffle equal/!noisy
+  // gaps), then add the chosen pit loss to whoever is pitting and re-sort. No
+  // pits => identical order, zero deltas, flat connector lines.
   const projected = useMemo<ProjectedRow[]>(() => {
     const cost: Record<PitType, number> = { green: pitLoss.green, vsc: pitLoss.vsc, sc: pitLoss.sc }
 
-    const racing: { d: DriverState; t: number; pitted: PitType | null }[] = []
-    const trailing: DriverState[] = [] // lapped / retired — kept at the back
+    const racing: { d: DriverState; base: number; t: number; pitted: PitType | null; rank: number }[] = []
+    const trailing: DriverState[] = [] // lapped / retired — kept at the back, in live order
 
+    let prevBase = 0
     for (const d of live) {
-      const base = baseTime(d)
-      if (base == null) {
+      const g = baseTime(d)
+      if (g == null) {
         trailing.push(d)
         continue
       }
+      // Clamp to keep the baseline monotonic in the live order, absorbing any
+      // timing noise where gap-to-leader briefly disagrees with classification.
+      const base = racing.length === 0 ? 0 : Math.max(g, prevBase + 0.001)
+      prevBase = base
       const pitted = pits.get(d.driverNumber) ?? null
-      racing.push({ d, t: base + (pitted ? cost[pitted] : 0), pitted })
+      racing.push({ d, base, t: base + (pitted ? cost[pitted] : 0), pitted, rank: racing.length })
     }
 
-    racing.sort((a, b) => a.t - b.t)
-    const leaderT = racing.length ? racing[0].t : 0
+    // Stable sort by adjusted time; ties keep live order via the original rank.
+    const order = racing
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => a.r.t - b.r.t || a.i - b.i)
+      .map(({ r }) => r)
 
-    const rows: ProjectedRow[] = racing.map((r, i) => {
-      const pos = i + 1
-      const prevT = i === 0 ? r.t : racing[i - 1].t
-      const oldPos = livePos.get(r.d.driverNumber) ?? pos
-      return {
-        d: r.d,
-        position: pos,
-        interval: i === 0 ? null : r.t - prevT,
-        leaderGap: i === 0 ? null : r.t - leaderT,
-        pitted: r.pitted,
-        delta: oldPos - pos, // positive => moved up
-      }
-    })
+    const leaderT = order.length ? order[0].t : 0
+
+    const rows: ProjectedRow[] = order.map((r, i) => ({
+      d: r.d,
+      position: i + 1,
+      interval: i === 0 ? null : r.t - order[i - 1].t,
+      leaderGap: i === 0 ? null : r.t - leaderT,
+      pitted: r.pitted,
+      delta: r.rank - i, // live rank vs projected rank; positive => moved up
+    }))
 
     let pos = racing.length
     for (const d of trailing) {
@@ -162,7 +167,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
       rows.push({ d, position: pos, interval: null, leaderGap: null, pitted: pits.get(d.driverNumber) ?? null, delta: null })
     }
     return rows
-  }, [live, pits, pitLoss, livePos])
+  }, [live, pits, pitLoss])
 
   const pitCount = pits.size
 
