@@ -56,27 +56,36 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
 - **All historical data (2023+) is free and needs no key** — including
   `car_data` telemetry and `location` track positions. Replaying any past race
   costs nothing.
-- **Only the live, real-time stream requires a paid OpenF1 subscription.** Add
-  your key in **Settings → API Key** (sent as a `Bearer` token) to drive the
-  Live mode off an in-progress session with minimal delay.
+- **Only the live, real-time stream requires a paid OpenF1 subscription.** The
+  recommended setup keeps the key **server-side**: deploy to Vercel and set
+  `OPENF1_API_KEY` in the project env. The bundled serverless proxy
+  (`api/[...path].mjs`) injects it as a `Bearer` token and the app calls it
+  same-origin at `/api/v1`, so the key never reaches the browser and one key
+  serves every viewer. (Settings → API Key still works as a local override.)
 
 ### How it plays
 
-Everything runs through one engine: load a session and play it through a virtual
-clock with **play/pause, 1–12× speed, a scrubber with per-lap markers you can tap
-to jump (with the pre-race / formation-lap segments shaded), and ‹ › lap-step
-buttons**. Every view (timing, map, telemetry, strategy, race control, weather)
-reflects the exact state at the playback moment, and the clock only ever reveals
-data up to that point — so you never get spoiled.
+The app opens on a **home screen** built from the season calendar:
 
-- **By default it loads `latest`** — the most recent session. If a race is in
-  progress it's *live*; otherwise it's the last completed race.
-- **Start from the beginning, no spoilers.** Loading an in-progress race begins
-  at lights-out (not the live edge). A **● LIVE** button jumps to and follows the
-  leading edge to catch up; speeds above 1× are disabled once you're at the edge.
-  The timeline keeps extending as the race runs.
-- **Pick any past race** from **Settings → Load a race** (year → Grand Prix →
-  session).
+- **A session live right now** → an **● LIVE** card that takes you straight into
+  real-time timing (every on-track session counts — practice, qualifying, sprint
+  and race).
+- **Nothing live** → a live **countdown** to the next session, a one-tap
+  **Replay the last race** shortcut, and **Load a past session** — a full-screen
+  picker (year → Grand Prix → session).
+
+A **live** session plays in real time; a **historical** pick plays as *live-sim*
+(replayed as if live, from lights-out). Either way it runs through one engine: a
+virtual clock with **play/pause, 1–12× speed, a scrubber with per-lap markers you
+can tap to jump (pre-race / formation-lap segments shaded), and ‹ › lap-step
+buttons**. Every view reflects the exact state at the playback moment, and the
+clock only ever reveals data up to that point — so you never get spoiled.
+
+- **Start from the beginning, no spoilers.** Entering an in-progress (or
+  live-sim) race begins at lights-out, not the live edge. A **● LIVE** button
+  jumps to and follows the leading edge to catch up; speeds above 1× are disabled
+  once you're at the edge. The timeline keeps extending as the race runs.
+- **⌂ Home** on the nav returns to the landing page at any time.
 - **`?simlive=<session_key>`** replays a finished race *as if it were live* for
   rehearsing the live flow midweek — see `docs/proposals/simlive.md`.
 

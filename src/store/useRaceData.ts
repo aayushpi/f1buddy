@@ -8,7 +8,9 @@ import {
   rawTimeBounds,
   type RawData,
 } from '../utils/derive'
-export type DataMode = 'live'
+// 'idle' loads nothing (used while the home screen is shown); 'live' loads and
+// plays a session (a real live one, or a finished one via simLive).
+export type DataMode = 'live' | 'idle'
 export type Connection = 'idle' | 'connecting' | 'live' | 'replay' | 'error'
 export type ActiveView =
   | 'timing'

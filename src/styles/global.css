@@ -1698,6 +1698,175 @@ button {
 .ps-move.up { color: var(--green); }
 .ps-move.down { color: var(--red); }
 
+/* ============================ Home / landing ============================ */
+.home {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+  gap: 18px;
+  overflow: hidden;
+}
+.home-top { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; z-index: 1; }
+.home-brand { display: flex; align-items: center; gap: 12px; }
+.home-logo { font-size: 26px; }
+.home-wordmark { font-size: 20px; font-weight: 800; letter-spacing: 0.04em; }
+
+.home-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  z-index: 1;
+}
+
+.home-hero {
+  width: min(640px, 100%);
+  padding: 36px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.home-hero.live { border-color: rgba(34, 224, 122, 0.5); box-shadow: 0 0 60px rgba(34, 224, 122, 0.14); }
+.home-hero-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home-hero-kicker.live { color: var(--green); }
+.home-hero-kicker.err { color: var(--red); }
+.live-pip { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 1.4s ease-in-out infinite; }
+.home-hero-title { font-size: 30px; font-weight: 800; letter-spacing: 0.01em; }
+.home-hero-sub { font-size: 14px; color: var(--text-dim); }
+.home-countdown {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  text-shadow: 0 0 26px var(--accent-glow);
+  margin: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+.home-cta {
+  margin-top: 14px;
+  padding: 14px 26px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.home-cta.primary {
+  background: linear-gradient(180deg, rgba(34, 224, 122, 0.28), rgba(34, 224, 122, 0.14));
+  border-color: var(--green);
+  color: #eafff3;
+}
+
+.home-actions { width: min(640px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.home-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.14s, background 0.14s;
+}
+.home-action:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.07); }
+.home-action-icon { font-size: 22px; color: var(--accent); width: 26px; text-align: center; }
+.home-action-text { display: flex; flex-direction: column; gap: 2px; }
+.home-action-title { font-size: 15px; font-weight: 700; }
+.home-action-sub { font-size: 12px; color: var(--muted); }
+.home-foot { flex: 0 0 auto; text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; z-index: 1; }
+
+.viewtabs-home { margin-right: 4px; }
+
+/* ============================ Session picker (full-screen) ============================ */
+.picker-screen {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px 22px;
+  gap: 16px;
+  overflow: hidden;
+}
+.picker-bar { display: flex; align-items: center; gap: 16px; flex: 0 0 auto; }
+.picker-back {
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.picker-back:hover { border-color: var(--accent); color: var(--text); }
+.picker-title { font-size: 20px; font-weight: 800; }
+.picker-years { margin-left: auto; }
+
+.picker-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.picker-note { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 24px 4px; font-size: 14px; }
+.picker-note.err { color: var(--red); }
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  padding-bottom: 8px;
+}
+.gp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.14s, background 0.14s;
+}
+.gp-card:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.07); }
+.gp-country { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.gp-name { font-size: 17px; font-weight: 800; }
+.gp-date { font-size: 12px; color: var(--text-dim); }
+
+.picker-sessions { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.ses-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.14s, background 0.14s;
+}
+.ses-card:hover { border-color: var(--accent); }
+.ses-card.race { border-color: rgba(255, 59, 70, 0.45); }
+.ses-card.race:hover { border-color: var(--red); }
+.ses-name { font-size: 16px; font-weight: 800; }
+.ses-date { font-size: 12px; color: var(--muted); }
+
 /* ============================================================
    Phone view (≤640px)
    The dashboard is built for iPad landscape; on a phone we keep
@@ -1814,4 +1983,17 @@ button {
   .ps-col .ps-body { max-height: 42vh; }
   .ps-col:first-child .ps-head, .ps-col:first-child .ps-row { grid-template-columns: 24px 1fr 52px 52px minmax(120px, 1.2fr); }
   .ps-btn { padding: 5px 6px; }
+
+  /* ---- Home / picker: tighten for a phone ---- */
+  .home { padding: 16px; gap: 14px; }
+  .home-main { gap: 16px; }
+  .home-hero { padding: 24px 20px; }
+  .home-hero-title { font-size: 22px; }
+  .home-countdown { font-size: 40px; }
+  .picker-screen { padding: 14px; }
+  .picker-bar { flex-wrap: wrap; gap: 10px; }
+  .picker-title { font-size: 16px; }
+  .picker-years { margin-left: 0; }
+  .picker-grid { grid-template-columns: 1fr 1fr; }
+  .picker-sessions { grid-template-columns: 1fr 1fr; }
 }

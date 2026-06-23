@@ -9,6 +9,7 @@ import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
 import { NoticeStack } from './components/NoticeStack'
 import { LiveEntryChoice } from './components/LiveEntryChoice'
+import { Home } from './components/Home'
 import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
@@ -76,28 +77,42 @@ export default function App() {
   const [liveChoiceOpen, setLiveChoiceOpen] = useState(false)
   const livePromptKey = useRef<string | null>(null)
 
+  // What the user picked on the home screen. null ⇒ show the landing page.
+  //  - live: a session in progress → real-time, re-fetching live mode.
+  //  - sim:  a finished session → replayed as if live (simLive).
+  const simLiveUrl = useMemo(parseSimLive, [])
+  const [selection, setSelection] = useState<{ mode: 'live' | 'sim'; sessionKey: number } | null>(
+    () => (simLiveUrl ? { mode: 'sim', sessionKey: simLiveUrl.key } : null),
+  )
+
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
     [settings.baseUrl, settings.apiKey],
   )
-  const sessionKey = useMemo<number | 'latest'>(() => {
-    if (settings.sessionKey === 'latest' || settings.sessionKey === '') return 'latest'
-    const n = Number(settings.sessionKey)
-    return Number.isFinite(n) ? n : 'latest'
-  }, [settings.sessionKey])
 
-  const simLive = useMemo(parseSimLive, [])
+  // A historical pick plays as live-sim from lights-out (real-time growing edge);
+  // the ?simlive= URL keeps its own speed/start for mid-week rehearsal.
+  const simLive = useMemo<SimLive | null>(() => {
+    if (!selection || selection.mode !== 'sim') return null
+    if (simLiveUrl && simLiveUrl.key === selection.sessionKey) return simLiveUrl
+    return { key: selection.sessionKey, startSec: 0, speed: 1 }
+  }, [selection, simLiveUrl])
 
   const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
-    mode: 'live',
+    mode: selection ? 'live' : 'idle',
     config,
-    // simlive forces loading a specific session (overriding the configured one).
-    sessionKey: simLive ? simLive.key : sessionKey,
+    sessionKey: selection ? selection.sessionKey : 'latest',
     simLive,
     lapWindow,
     activeView,
     reloadNonce,
   })
+
+  const goHome = () => {
+    setSelection(null)
+    setLiveChoiceOpen(false)
+    setFocusDriver(null)
+  }
 
   useEffect(() => {
     if (selected.size === 0 && snapshot && snapshot.drivers.length) {
@@ -105,14 +120,16 @@ export default function App() {
     }
   }, [snapshot, selected.size])
 
+  const sessionId = selection ? `${selection.mode}:${selection.sessionKey}` : 'home'
+
   // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
   // surfaced as a stacked, auto-dismissing popover. Reset per session.
-  const { notices, dismiss } = useRaceNotices(snapshot, String(sessionKey))
+  const { notices, dismiss } = useRaceNotices(snapshot, sessionId)
 
   // When an in-progress race finishes loading, ask once how to start it. Default
   // is spoiler-free (the engine already begins at lights-out); jumping to live
   // is an explicit, separated choice. Keyed per load so it only asks once.
-  const loadId = `${String(sessionKey)}:${reloadNonce}`
+  const loadId = `${sessionId}:${reloadNonce}`
   const isLive = replay?.live ?? false
   const ready = !!snapshot && snapshot.drivers.length > 0
   useEffect(() => {
@@ -140,10 +157,9 @@ export default function App() {
     }
   }, [settings, lapWindow, selected, activeView])
 
-  // Load a specific session picked from the browser: stash its key and the
-  // store loads/replays it.
+  // A session picked from the Settings browser replays as live-sim.
   const loadSession = (key: number) => {
-    setSettings((s) => ({ ...s, sessionKey: String(key) }))
+    setSelection({ mode: 'sim', sessionKey: key })
   }
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
@@ -177,11 +193,11 @@ export default function App() {
               <>
                 <div className="spinner" />
                 <div className="big">
-                  {typeof sessionKey === 'number'
-                    ? 'Loading session — fetching the full race…'
-                    : connection === 'connecting'
+                  {selection?.mode === 'live'
+                    ? connection === 'connecting'
                       ? 'Connecting to the timing feed…'
-                      : 'Waiting for session data…'}
+                      : 'Waiting for session data…'
+                    : 'Loading session — fetching the full race…'}
                 </div>
               </>
             )}
@@ -301,6 +317,30 @@ export default function App() {
     }
   }
 
+  // No session picked yet → the landing page (countdown / live / load past).
+  if (!selection) {
+    return (
+      <>
+        <Home
+          config={config}
+          onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key })}
+          onReplay={(key) => setSelection({ mode: 'sim', sessionKey: key })}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        <SettingsDrawer
+          open={settingsOpen}
+          settings={settings}
+          onClose={() => setSettingsOpen(false)}
+          onApply={setSettings}
+          config={config}
+          sessionKey="latest"
+          activeLabel={null}
+          onLoadSession={loadSession}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="app">
       <div className="fx-grid" />
@@ -311,6 +351,7 @@ export default function App() {
         connection={connection}
         status={snapshot?.race.status ?? 'UNKNOWN'}
         onSettings={() => setSettingsOpen(true)}
+        onHome={goHome}
       />
 
       {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
@@ -329,9 +370,9 @@ export default function App() {
         onClose={() => setSettingsOpen(false)}
         onApply={setSettings}
         config={config}
-        sessionKey={sessionKey}
+        sessionKey={selection.sessionKey}
         activeLabel={
-          typeof sessionKey === 'number' && snapshot?.race
+          snapshot?.race
             ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
             : null
         }

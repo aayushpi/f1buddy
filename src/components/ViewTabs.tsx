@@ -20,6 +20,7 @@ interface Props {
   connection: Connection
   status: TrackStatus
   onSettings: () => void
+  onHome: () => void
 }
 
 interface Dot {
@@ -51,10 +52,13 @@ function dotState(status: TrackStatus, connection: Connection): Dot {
   }
 }
 
-export function ViewTabs({ active, onChange, connection, status, onSettings }: Props) {
+export function ViewTabs({ active, onChange, connection, status, onSettings, onHome }: Props) {
   const dot = dotState(status, connection)
   return (
     <nav className="viewtabs panel">
+      <button className="icon-btn viewtabs-home" onClick={onHome} title="Home" aria-label="Home">
+        ⌂
+      </button>
       {TABS.map((t) => (
         <button
           key={t.id}
