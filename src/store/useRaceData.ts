@@ -8,11 +8,8 @@ import {
   rawTimeBounds,
   type RawData,
 } from '../utils/derive'
-import { RaceSim } from '../data/sim'
-import { simChannels } from '../data/circuit'
-
-export type DataMode = 'sim' | 'live'
-export type Connection = 'idle' | 'connecting' | 'live' | 'sim' | 'replay' | 'error'
+export type DataMode = 'live'
+export type Connection = 'idle' | 'connecting' | 'live' | 'replay' | 'error'
 export type ActiveView =
   | 'timing'
   | 'map'
@@ -23,6 +20,15 @@ export type ActiveView =
   | 'control'
   | 'weather'
 
+// Dev-only "simulated live": replay a finished session as if it were happening
+// now. See docs/proposals/simlive.md. `startSec` is how far into the race the
+// virtual clock begins; `speed` is how fast that virtual edge advances.
+export interface SimLive {
+  key: number
+  speed: number
+  startSec: number
+}
+
 export interface DataOptions {
   mode: DataMode
   config: OpenF1Config
@@ -30,6 +36,7 @@ export interface DataOptions {
   lapWindow: number
   activeView: ActiveView
   reloadNonce: number
+  simLive?: SimLive | null
 }
 
 export interface LapMarker {
@@ -44,6 +51,10 @@ export interface ReplayControls {
   playing: boolean
   speed: number
   lapMarkers: LapMarker[]
+  // Start of the formation/grid window (session start) when it sits before lap 1;
+  // null if unknown. Everything tMin..formationStart is pre-race standing time,
+  // formationStart..lap1 is the formation lap ("lap 0").
+  formationStart: number | null
   // The session is still in progress, so the timeline keeps growing.
   live: boolean
   // Playback is pinned to the live edge (following new data as it arrives).
@@ -117,7 +128,6 @@ function buildOutline(locs: { x: number; y: number; date: string }[]): { x: numb
   return out
 }
 
-const SIM_INTERVAL = 1000
 const CLOCK_INTERVAL = 200 // replay tick
 const TRACE_BACK_MS = 20000 // telemetry history fetched behind the clock
 const LIVE_REFETCH_MS = 12000 // how often a live session pulls fresh data to extend the timeline
@@ -147,7 +157,7 @@ const emptyRaw = (): RawData => ({
 const TELEMETRY_VIEWS: ActiveView[] = ['map', 'telemetry']
 
 export function useRaceData(opts: DataOptions): DataResult {
-  const { mode, config, sessionKey, lapWindow, activeView, reloadNonce } = opts
+  const { mode, config, sessionKey, lapWindow, activeView, reloadNonce, simLive } = opts
 
   const [snapshot, setSnapshot] = useState<RaceSnapshot | null>(null)
   const [connection, setConnection] = useState<Connection>('idle')
@@ -167,14 +177,15 @@ export function useRaceData(opts: DataOptions): DataResult {
   const clock = useRef({ tNow: 0, tMin: 0, tMax: 1, raceEnd: 1, playing: true, speed: 6 })
   const dirty = useRef(false) // force a rebuild on the next tick (after a seek)
   const markersRef = useRef<LapMarker[]>([])
+  const formationStartRef = useRef<number | null>(null)
   const follow = useRef(false) // pinned to the live edge ("go live")
   const isLiveRef = useRef(false) // the loaded session is still in progress
 
+  // A lap-window change should re-reveal the current moment immediately, even
+  // when playback is paused; the clock loop rebuilds on the next tick.
   useEffect(() => {
-    if (rawRef.current.drivers.length && mode !== 'live') {
-      setSnapshot(buildSnapshot(rawRef.current, lapWindow))
-    }
-  }, [lapWindow, mode])
+    dirty.current = true
+  }, [lapWindow])
 
   // ---- Replay controls (stable) ----
   const syncClock = useCallback(() => {
@@ -186,6 +197,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       playing: c.playing,
       speed: c.speed,
       lapMarkers: markersRef.current,
+      formationStart: formationStartRef.current,
       live: isLiveRef.current,
       atLive: follow.current || (isLiveRef.current && c.tNow >= c.tMax - AT_LIVE_MS),
     })
@@ -228,29 +240,10 @@ export function useRaceData(opts: DataOptions): DataResult {
     follow.current = true
     c.tNow = c.tMax
     c.playing = true
+    c.speed = 1 // at the live edge you can only watch in real time
     dirty.current = true
     syncClock()
   }, [syncClock])
-
-  // ---- Simulation mode ----
-  useEffect(() => {
-    if (mode !== 'sim') return
-    setReplayState(null)
-    setTrackOutline(null)
-    setTrackChannels(simChannels())
-    const sim = new RaceSim()
-    sim.reset()
-    setConnection('sim')
-    setError(null)
-    const tick = () => {
-      rawRef.current = sim.snapshot()
-      setSnapshot(buildSnapshot(rawRef.current, lapWindowRef.current))
-      setLastUpdated(Date.now())
-    }
-    tick()
-    const id = setInterval(tick, SIM_INTERVAL)
-    return () => clearInterval(id)
-  }, [mode])
 
   // ---- Live / replay: load a session and play it through time ----
   // Whether you join an in-progress race or pick a past one, playback always
@@ -272,6 +265,18 @@ export function useRaceData(opts: DataOptions): DataResult {
     setTrackChannels(null)
     follow.current = false // default: watch from the beginning
     isLiveRef.current = false
+    formationStartRef.current = null
+
+    // Grid/formation starts at the session start, when it sits a sensible gap
+    // before lap 1. (No "lap 0" exists in the feed, so we derive it.)
+    const computeFormation = () => {
+      const grid = Date.parse(rawRef.current.session?.date_start ?? '')
+      const racing = markersRef.current[0]?.t
+      formationStartRef.current =
+        Number.isFinite(grid) && racing != null && grid > clock.current.tMin && grid < racing && racing - grid < 15 * 60 * 1000
+          ? grid
+          : null
+    }
 
     let key = 0
     let gotOutline = false
@@ -335,9 +340,16 @@ export function useRaceData(opts: DataOptions): DataResult {
         ])
       if (cancelled) return
       const r = rawRef.current
-      r.intervals = intervals; r.positions = positions; r.laps = laps; r.stints = stints
-      r.pits = pits; r.raceControl = rc; r.weather = weather; r.teamRadio = radio
-      r.overtakes = overtakes; r.startingGrid = grid; r.results = results
+      // A failed/transient feed comes back as [] (see `safe`). Don't let that
+      // wipe good data on a live re-fetch — keep the previous values so the UI
+      // doesn't blink empty and then refill. Race feeds only ever grow.
+      const keep = <T,>(next: T[], prev: T[]) => (next.length ? next : prev)
+      r.intervals = keep(intervals, r.intervals); r.positions = keep(positions, r.positions)
+      r.laps = keep(laps, r.laps); r.stints = keep(stints, r.stints)
+      r.pits = keep(pits, r.pits); r.raceControl = keep(rc, r.raceControl)
+      r.weather = keep(weather, r.weather); r.teamRadio = keep(radio, r.teamRadio)
+      r.overtakes = keep(overtakes, r.overtakes); r.startingGrid = keep(grid, r.startingGrid)
+      r.results = keep(results, r.results)
     }
 
     // Best-effort one-shot circuit outline from an early green-flag lap. Retries
@@ -386,7 +398,11 @@ export function useRaceData(opts: DataOptions): DataResult {
       const c = clock.current
       c.tMax = bounds.max
       c.raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
-      markersRef.current = buildLapMarkers(r)
+      // Never replace existing lap markers with an empty set — a transient empty
+      // feed would otherwise make the scrubber's lap ticks blink out and back.
+      const m = buildLapMarkers(r)
+      if (m.length || markersRef.current.length === 0) markersRef.current = m
+      computeFormation()
     }
 
     let clockId: ReturnType<typeof setInterval>
@@ -419,7 +435,9 @@ export function useRaceData(opts: DataOptions): DataResult {
         rawRef.current.session = session
 
         const endMs = Date.parse(session.date_end)
-        const isLive = Number.isFinite(endMs) ? Date.now() < endMs + LIVE_WINDOW_MS : true
+        const isLive = simLive
+          ? true
+          : Number.isFinite(endMs) ? Date.now() < endMs + LIVE_WINDOW_MS : true
         isLiveRef.current = isLive
 
         const [drivers, meetings] = await Promise.all([
@@ -441,14 +459,24 @@ export function useRaceData(opts: DataOptions): DataResult {
         const hasTimeline = bounds.max > bounds.min + 1000
         const raceEnd = Number.isFinite(endIso) ? Math.min(endIso, bounds.max) : bounds.max
         markersRef.current = buildLapMarkers(rawRef.current)
+
+        // Simulated-live: a virtual "now" that advances in real time. tMax (the
+        // watchable edge) tracks it; raceEnd stays the *real* finish so the final
+        // classification can't leak when you reach the simulated edge.
+        const realMax = bounds.max
+        const mountedAt = Date.now()
+        const vnow = () =>
+          simLive ? bounds.min + simLive.startSec * 1000 + (Date.now() - mountedAt) * simLive.speed : realMax
+
         clock.current = {
           tMin: bounds.min,
-          tMax: bounds.max,
+          tMax: simLive ? Math.min(realMax, vnow()) : bounds.max,
           raceEnd,
           tNow: hasTimeline ? bounds.min : bounds.max, // start at the beginning
           playing: hasTimeline || isLive,
           speed: isLive ? 1 : 6, // live: watch in real time; past: fast replay
         }
+        computeFormation()
         syncClock()
         setConnection(isLive ? 'live' : 'replay')
         build()
@@ -457,6 +485,14 @@ export function useRaceData(opts: DataOptions): DataResult {
 
         clockId = setInterval(() => {
           const c = clock.current
+          // Simulated-live: advance the watchable edge with the virtual clock.
+          if (simLive) {
+            const edge = Math.min(realMax, vnow())
+            if (edge !== c.tMax) {
+              c.tMax = edge
+              if (!c.playing && !follow.current) syncClock() // reflect a growing edge while paused/at start
+            }
+          }
           if (follow.current) {
             // Pinned to the live edge.
             if (c.tNow !== c.tMax) {
@@ -466,8 +502,10 @@ export function useRaceData(opts: DataOptions): DataResult {
           } else if (c.playing) {
             c.tNow = Math.min(c.tMax, c.tNow + CLOCK_INTERVAL * c.speed)
             if (c.tNow >= c.tMax) {
-              if (isLiveRef.current) follow.current = true // caught up → follow the live edge
-              else c.playing = false
+              if (isLiveRef.current) {
+                follow.current = true // caught up → follow the live edge
+                c.speed = 1 // and drop to real-time (can't outrun live)
+              } else c.playing = false
             }
             syncClock()
           }
@@ -482,8 +520,10 @@ export function useRaceData(opts: DataOptions): DataResult {
           }
         }, CLOCK_INTERVAL)
 
-        // Keep an in-progress session's timeline growing.
-        if (isLive) liveId = setInterval(liveRefetch, LIVE_REFETCH_MS)
+        // Keep a real in-progress session's timeline growing via re-fetch.
+        // Simulated-live needs no network — all data is already loaded and the
+        // tick advances the edge locally.
+        if (isLive && !simLive) liveId = setInterval(liveRefetch, LIVE_REFETCH_MS)
       } catch (e) {
         if (!cancelled && !signal.aborted) {
           setError(e instanceof Error ? e.message : String(e))
@@ -499,7 +539,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       clearInterval(clockId)
       if (liveId) clearInterval(liveId)
     }
-  }, [mode, config, sessionKey, syncClock, reloadNonce])
+  }, [mode, config, sessionKey, syncClock, reloadNonce, simLive])
 
   const replay: ReplayControls | null = replayState
     ? { ...replayState, toggle, setSpeed, seek, goLive }

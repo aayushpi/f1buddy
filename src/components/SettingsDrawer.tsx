@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { OpenF1Config } from '../api/openf1'
-import type { DataMode } from '../store/useRaceData'
 import { SessionBrowser } from './SessionBrowser'
 
 export interface AppSettings {
@@ -15,9 +14,6 @@ interface Props {
   settings: AppSettings
   onClose: () => void
   onApply: (s: AppSettings) => void
-  // Mode + race loading live here now (out of the header chrome).
-  mode: DataMode
-  onMode: (m: DataMode) => void
   config: OpenF1Config
   sessionKey: number | 'latest'
   activeLabel: string | null
@@ -29,8 +25,6 @@ export function SettingsDrawer({
   settings,
   onClose,
   onApply,
-  mode,
-  onMode,
   config,
   sessionKey,
   activeLabel,
@@ -41,8 +35,7 @@ export function SettingsDrawer({
 
   const set = (patch: Partial<AppSettings>) => setDraft((d) => ({ ...d, ...patch }))
 
-  // Loading a historical race implies Live mode; close the drawer so the
-  // replay is visible immediately.
+  // Close the drawer once a race is picked so the replay is visible immediately.
   const loadSession = (key: number) => {
     onLoadSession(key)
     onClose()
@@ -57,25 +50,10 @@ export function SettingsDrawer({
         animate={{ x: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 38 }}
       >
-        <h2>Mode</h2>
+        <h2>Load a race</h2>
 
         <div className="field">
-          <div className="seg drawer-seg">
-            <button className={mode === 'sim' ? 'active' : ''} onClick={() => onMode('sim')}>
-              Demo
-            </button>
-            <button className={mode === 'live' ? 'active' : ''} onClick={() => onMode('live')}>
-              Live
-            </button>
-          </div>
-          <span className="hint">
-            <b>Demo</b> runs a fully offline simulated race. <b>Live</b> connects to OpenF1 — the
-            session in progress, or a past race you load below.
-          </span>
-        </div>
-
-        <div className="field">
-          <label>Load a race</label>
+          <label>Grand Prix</label>
           <SessionBrowser
             config={config}
             currentSessionKey={sessionKey}
@@ -115,7 +93,7 @@ export function SettingsDrawer({
           />
           <span className="hint">
             OpenF1 serves free historical data (2023+). True real-time timing requires a paid key —
-            add it here and it is sent as a Bearer token. Demo mode needs no connection.
+            add it here and it is sent as a Bearer token.
           </span>
         </div>
 

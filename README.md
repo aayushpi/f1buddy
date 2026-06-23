@@ -60,21 +60,29 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
   your key in **Settings → API Key** (sent as a `Bearer` token) to drive the
   Live mode off an in-progress session with minimal delay.
 
-### Modes
+### How it plays
 
-- **Demo** *(default)* — a fully offline race simulator that produces
-  OpenF1-shaped data and runs through the exact same rendering pipeline as live
-  data. Great for trying the UI when no race is on (≈4 real seconds per lap).
-- **Replay** — pick any historical race from the **Sessions** dropdown (year →
-  Grand Prix → session). The app loads the whole session and plays it through a
-  virtual clock with **play/pause, 1–12× speed, a scrubber with per-lap markers
-  you can tap to jump, and ‹ › lap-step buttons**; every view (timing, map,
-  telemetry, strategy, race control, weather) reflects the exact state at that
-  moment. The clock is anchored to the racing feeds (not the pre-race
-  weather/race-control records), and `car_data`/`location` are streamed in a
-  window around the clock so the map and telemetry stay light.
-- **Live (latest)** — set the session to `latest` to poll whatever is currently
-  running. Order/gaps refresh ~4.5 s, laps/stints/flags ~12 s.
+Everything runs through one engine: load a session and play it through a virtual
+clock with **play/pause, 1–12× speed, a scrubber with per-lap markers you can tap
+to jump (with the pre-race / formation-lap segments shaded), and ‹ › lap-step
+buttons**. Every view (timing, map, telemetry, strategy, race control, weather)
+reflects the exact state at the playback moment, and the clock only ever reveals
+data up to that point — so you never get spoiled.
+
+- **By default it loads `latest`** — the most recent session. If a race is in
+  progress it's *live*; otherwise it's the last completed race.
+- **Start from the beginning, no spoilers.** Loading an in-progress race begins
+  at lights-out (not the live edge). A **● LIVE** button jumps to and follows the
+  leading edge to catch up; speeds above 1× are disabled once you're at the edge.
+  The timeline keeps extending as the race runs.
+- **Pick any past race** from **Settings → Load a race** (year → Grand Prix →
+  session).
+- **`?simlive=<session_key>`** replays a finished race *as if it were live* for
+  rehearsing the live flow midweek — see `docs/proposals/simlive.md`.
+
+The clock is anchored to the racing feeds (not the pre-race weather/race-control
+records), and `car_data`/`location` are streamed in a window around the clock so
+the map and telemetry stay light.
 
 ## Running it
 
@@ -104,12 +112,13 @@ npm run preview  # serve the production build
 
 ```
 src/
-  api/          OpenF1 client + raw/derived types
-  data/sim.ts   offline race simulator (Demo mode)
-  store/        polling + state orchestration (useRaceData)
-  utils/        formatting + the derivation pipeline (raw -> view model)
-  components/    Header, TimingTower, LapAnalysis, LapChart, Ticker, Settings…
+  api/             OpenF1 client + raw/derived types
+  data/circuits.ts real circuit outlines (from the MIT f1-circuits dataset)
+  store/           polling + replay clock orchestration (useRaceData)
+  utils/           formatting + the derivation pipeline (raw -> view model)
+  components/      ViewTabs, TimingTower, LapAnalysis, ReplayBar, Settings…
+server/proxy.mjs   caching proxy (keeps the API key server-side, fans out to viewers)
 ```
 
-The key idea: **all data — live or simulated — is normalised by
-`utils/derive.ts` into a single `RaceSnapshot`** that the components render.
+The key idea: **all data is normalised by `utils/derive.ts` into a single
+`RaceSnapshot`** that the components render.

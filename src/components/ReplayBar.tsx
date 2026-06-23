@@ -18,10 +18,24 @@ function elapsed(ms: number): string {
 }
 
 export function ReplayBar({ replay, currentLap }: Props) {
-  const { tMin, tMax, tNow, playing, speed, lapMarkers, live, atLive } = replay
+  const { tMin, tMax, tNow, playing, speed, lapMarkers, live, atLive, formationStart } = replay
   const dur = tMax - tMin || 1
   const pct = ((tNow - tMin) / dur) * 100
   const atEnd = tNow >= tMax - 250
+
+  // Before lap 1 there are two zones we shade distinctly from green-flag racing:
+  //   pre-race standing time  [tMin .. formationStart]  — hatched
+  //   formation lap ("lap 0") [formationStart .. lap 1] — solid, slightly tinted
+  const pctOf = (t: number) => Math.max(0, Math.min(100, ((t - tMin) / dur) * 100))
+  const raceStartT = lapMarkers.length ? lapMarkers[0].t : tMin
+  const hasFormation = formationStart != null && formationStart > tMin && formationStart < raceStartT
+  const deadAirEnd = hasFormation ? formationStart! : raceStartT
+  const prePct = pctOf(deadAirEnd) // pre-race standing band width
+  const formEndPct = pctOf(raceStartT) // lights out
+  const showPreBand = prePct > 0.8
+  const showPreLabel = prePct >= 7
+  const showFormBand = hasFormation && formEndPct - prePct > 0.3
+  const showZeroLabel = hasFormation && formEndPct - prePct >= 4
 
   // Show every lap as a notch; label majors so a long race stays legible.
   const majorEvery = lapMarkers.length > 40 ? 10 : 5
@@ -54,6 +68,16 @@ export function ReplayBar({ replay, currentLap }: Props) {
         <span className="mono time">{clock(tNow)}</span>
         <div className="scrub-wrap">
           <div className="lap-ticks">
+            {showPreLabel && (
+              <span className="prerace-label" style={{ left: 0 }}>
+                Pre-race
+              </span>
+            )}
+            {showZeroLabel && (
+              <span className="prerace-label formation" style={{ left: `${(prePct + formEndPct) / 2}%` }}>
+                0
+              </span>
+            )}
             {lapMarkers.map((m) => {
               const left = ((m.t - tMin) / dur) * 100
               if (left < 0 || left > 100) return null
@@ -71,6 +95,13 @@ export function ReplayBar({ replay, currentLap }: Props) {
               )
             })}
           </div>
+          {showPreBand && <div className="prerace-band" style={{ width: `${prePct}%` }} />}
+          {showFormBand && (
+            <div
+              className="formation-band"
+              style={{ left: `${prePct}%`, width: `${formEndPct - prePct}%` }}
+            />
+          )}
           <input
             className="scrub"
             type="range"
@@ -89,7 +120,15 @@ export function ReplayBar({ replay, currentLap }: Props) {
 
       <div className="seg replay-speeds">
         {SPEEDS.map((s) => (
-          <button key={s} className={s === speed ? 'active' : ''} onClick={() => replay.setSpeed(s)}>
+          <button
+            key={s}
+            className={s === speed ? 'active' : ''}
+            // At the live edge you can only watch in real time — there's no
+            // buffered-ahead data to fast-forward into.
+            disabled={atLive && s !== 1}
+            title={atLive && s !== 1 ? 'Unavailable while watching live' : undefined}
+            onClick={() => replay.setSpeed(s)}
+          >
             {s}×
           </button>
         ))}
