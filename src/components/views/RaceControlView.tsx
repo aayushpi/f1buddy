@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react'
-import type { OvertakeEvent, RaceControlEntry, RadioClip } from '../../api/types'
+import type { DriverState, OvertakeEvent, RaceControlEntry, RadioClip } from '../../api/types'
 import { formatRaceMessage, teamHex, timeOfDay } from '../../utils/format'
 
 interface Props {
   log: RaceControlEntry[]
   overtakes: OvertakeEvent[]
   radios: RadioClip[]
+  drivers: DriverState[]
+  // Drivers the user wants race-control + radio popups for.
+  notify: Set<number>
+  onToggleNotify: (n: number) => void
 }
 
 function flagClass(entry: RaceControlEntry): string {
@@ -43,9 +47,30 @@ function RadioPlayer({ clip }: { clip: RadioClip }) {
   )
 }
 
-export function RaceControlView({ log, overtakes, radios }: Props) {
+export function RaceControlView({ log, overtakes, radios, drivers, notify, onToggleNotify }: Props) {
   return (
     <div className="control-view">
+      <div className="panel rc-notify">
+        <div className="panel-title">
+          <span className="dot" />
+          Notify me about
+          <span className="rc-notify-hint">race control &amp; radio for selected drivers</span>
+        </div>
+        <div className="driver-chips">
+          {drivers.map((d) => (
+            <button
+              key={d.driverNumber}
+              className={`chip ${notify.has(d.driverNumber) ? 'on' : ''}`}
+              style={{ ['--team' as string]: teamHex(d.teamColour) }}
+              onClick={() => onToggleNotify(d.driverNumber)}
+            >
+              <span className="swatch" />
+              {d.acronym}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="panel rc-log">
         <div className="panel-title">
           <span className="dot" />

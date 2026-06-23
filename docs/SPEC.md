@@ -80,11 +80,15 @@ returns to the home screen.
 Auto-dismissing popovers, stacked newest-at-bottom so a burst reads in order:
 
 - **Fastest lap** and **fastest sector (overall)** — fire at the real crossing.
-- **Race control** bulletins — message normalised from ALL CAPS to sentence
-  case, preserving acronyms (DRS/VSC), driver codes `(VER)` and positions `P4`.
-- **Team radio** — playable clips.
+  Always on.
+- **Race control** bulletins and **team radio** — **opt-in per driver** to keep
+  the stack quiet: they pop up only for drivers toggled on in the Race Control
+  tab's "Notify me about" chips (default: none). Messages are still normalised
+  from ALL CAPS to sentence case, preserving acronyms (DRS/VSC), driver codes
+  `(VER)` and positions `P4`.
 
-The full history always remains in the Race Control tab.
+The full history always remains in the Race Control tab; the nav status dot
+still reflects track-wide flags. The opt-in set persists across sessions.
 
 ## 6. Chrome
 
@@ -102,6 +106,9 @@ The full history always remains in the Race Control tab.
 `Telemetry`, `Strategy`, `Pit Simulator` (what-if pit-stop order vs. live),
 `Race Control`, `Weather`.
 
+- **Gap to Leader:** plots each car's gap to the *true* race leader, lap by lap.
+  Every driver is a chip toggle (top 5 on by default, per session); toggling
+  changes which traces are drawn without moving the leader baseline.
 - **Track Map:** draws the real circuit outline from a generated library
   (`data/circuits.ts`, from the MIT f1-circuits dataset), **registered onto the
   live coordinate frame** (`utils/trackAlign.ts`) so the car dots sit on it;

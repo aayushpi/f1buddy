@@ -45,6 +45,8 @@ interface Persisted {
   lapWindow: number
   selected: number[]
   activeView: ActiveView
+  // Drivers opted into race-control + radio popups (a stable per-season pref).
+  notify: number[]
 }
 
 const DEFAULTS: Persisted = {
@@ -52,6 +54,7 @@ const DEFAULTS: Persisted = {
   lapWindow: 6,
   selected: [],
   activeView: 'timing',
+  notify: [],
 }
 
 function loadState(): Persisted {
@@ -69,7 +72,12 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(initial.settings)
   const [lapWindow, setLapWindow] = useState(initial.lapWindow)
   const [selected, setSelected] = useState<Set<number>>(new Set(initial.selected))
+  // Gap-to-Leader visibility (its own set; defaults to the top 5 per session).
+  const [gapSelected, setGapSelected] = useState<Set<number>>(new Set())
+  // Drivers the user wants race-control + radio popups for.
+  const [notify, setNotify] = useState<Set<number>>(new Set(initial.notify))
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
+  const gapSeeded = useRef<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
@@ -122,9 +130,19 @@ export default function App() {
 
   const sessionId = selection ? `${selection.mode}:${selection.sessionKey}` : 'home'
 
-  // Live alerts: fastest laps/sectors, race-control bulletins and team radios,
-  // surfaced as a stacked, auto-dismissing popover. Reset per session.
-  const { notices, dismiss } = useRaceNotices(snapshot, sessionId)
+  // Seed the Gap-to-Leader view with the top 5 once per session, then leave it
+  // entirely under user control (they can toggle any driver, including to none).
+  useEffect(() => {
+    if (snapshot && snapshot.drivers.length && gapSeeded.current !== sessionId) {
+      gapSeeded.current = sessionId
+      setGapSelected(new Set(snapshot.drivers.slice(0, 5).map((d) => d.driverNumber)))
+    }
+  }, [snapshot, sessionId])
+
+  // Live alerts: fastest laps/sectors always; race-control + radio popups only
+  // for drivers the user opted into. The full record stays in the Race Control
+  // tab. Reset per session.
+  const { notices, dismiss } = useRaceNotices(snapshot, sessionId, notify)
 
   // When an in-progress race finishes loading, ask once how to start it. Default
   // is spoiler-free (the engine already begins at lights-out); jumping to live
@@ -149,13 +167,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView }
+    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView, notify: [...notify] }
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(data))
     } catch {
       /* ignore */
     }
-  }, [settings, lapWindow, selected, activeView])
+  }, [settings, lapWindow, selected, activeView, notify])
 
   // A session picked from the Settings browser replays as live-sim.
   const loadSession = (key: number) => {
@@ -164,13 +182,17 @@ export default function App() {
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
-  const toggleDriver = (n: number) =>
-    setSelected((prev) => {
+  const toggleIn = (set: (fn: (prev: Set<number>) => Set<number>) => void) => (n: number) =>
+    set((prev) => {
       const next = new Set(prev)
       if (next.has(n)) next.delete(n)
       else next.add(n)
       return next
     })
+
+  const toggleDriver = toggleIn(setSelected)
+  const toggleGap = toggleIn(setGapSelected)
+  const toggleNotify = toggleIn(setNotify)
 
   const hasData = !!snapshot && snapshot.drivers.length > 0
 
@@ -260,6 +282,8 @@ export default function App() {
           <div className="viewbody">
             <GapChart
               drivers={snapshot.drivers}
+              selected={gapSelected}
+              onToggle={toggleGap}
               raceControl={snapshot.raceControlLog}
               meetingName={snapshot.race.meetingName}
               sessionName={snapshot.race.sessionName}
@@ -305,7 +329,14 @@ export default function App() {
       case 'control':
         return (
           <div className="viewbody">
-            <RaceControlView log={snapshot.raceControlLog} overtakes={snapshot.overtakes} radios={snapshot.radios} />
+            <RaceControlView
+              log={snapshot.raceControlLog}
+              overtakes={snapshot.overtakes}
+              radios={snapshot.radios}
+              drivers={snapshot.drivers}
+              notify={notify}
+              onToggleNotify={toggleNotify}
+            />
           </div>
         )
       case 'weather':

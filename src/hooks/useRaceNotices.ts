@@ -56,11 +56,23 @@ function overallSectors(drivers: RaceSnapshot['drivers']) {
  * clears baselines so a new race doesn't replay stale alerts. The first snapshot
  * of a session only primes the baselines — it never fires a flood of notices.
  */
-export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) {
+export function useRaceNotices(
+  snapshot: RaceSnapshot | null,
+  resetKey: string,
+  // Drivers the user has opted into for race-control + radio popups. Empty ⇒ no
+  // RC/radio notifications at all (they stay only in the Race Control tab).
+  // Fastest-lap / fastest-sector alerts are unaffected.
+  notifyDrivers: Set<number>,
+) {
   const [notices, setNotices] = useState<Notice[]>([])
   const base = useRef<Baselines>(freshBaselines())
   const seq = useRef(0)
   const nextId = () => `n${seq.current++}`
+
+  // Read the live subscription inside the snapshot-keyed effect without making
+  // it a dependency (which would otherwise re-scan and could replay alerts).
+  const notifyRef = useRef(notifyDrivers)
+  notifyRef.current = notifyDrivers
 
   // New session: forget everything.
   useEffect(() => {
@@ -91,6 +103,8 @@ export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) 
       .filter((e) => e.date > b.controlDate)
       .sort((a, x) => (a.date < x.date ? -1 : 1))
     for (const e of newControl) {
+      // Only surface race-control bulletins tied to a driver the user follows.
+      if (e.driverNumber == null || !notifyRef.current.has(e.driverNumber)) continue
       fresh.push({
         id: nextId(),
         kind: 'control',
@@ -132,6 +146,8 @@ export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) 
       .filter((r) => r.date > b.radioDate)
       .sort((a, x) => (a.date < x.date ? -1 : 1))
     for (const r of newRadios) {
+      // Only surface radios from a driver the user follows.
+      if (!notifyRef.current.has(r.driverNumber)) continue
       fresh.push({ id: nextId(), kind: 'radio', acronym: r.acronym, colour: teamHex(r.colour), url: r.url })
     }
     if (snapshot.radios[0]) b.radioDate = snapshot.radios[0].date
