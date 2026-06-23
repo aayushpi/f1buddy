@@ -56,9 +56,10 @@ interface Link {
 function GapCell({ value, label }: { value: number | null; label?: string }) {
   const clear = value != null && value >= CLEAR_AIR
   return (
-    <span className={`ps-gap mono ${clear ? 'clear-air' : ''}`} title={clear ? 'Clear air (>5s)' : undefined}>
-      {label ?? gapText(value)}
-    </span>
+    <div className={`ps-gap mono ${clear ? 'clear-air' : ''}`}>
+      <span className="ps-gap-val">{label ?? gapText(value)}</span>
+      {clear && <span className="ps-air" title="Gap over 5s — clear air">CLEAR AIR</span>}
+    </div>
   )
 }
 
