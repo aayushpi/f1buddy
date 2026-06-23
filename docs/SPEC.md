@@ -105,9 +105,13 @@ still reflects track-wide flags. Both preferences persist across sessions.
 
 ## 7. Views
 
-`Timing` (tower + lap-time analysis), `Track Map`, `Speed Map`, `Gap to Leader`,
+`Timing` (tower + lap-time analysis), `Track Map`, `Gap to Leader`,
 `Telemetry`, `Strategy`, `Pit Simulator` (what-if pit-stop order vs. live),
 `Race Control`, `Weather`.
+
+- **Strategy:** the stint Gantt colours each set by `tyre_age_at_start` — sets
+  that started (near-)fresh (<2 laps) glow in vivid compound colours, used sets
+  stay muted — and each bar shows the tyre's total life in laps.
 
 - **Gap to Leader:** plots each car's gap to the *true* race leader, lap by lap.
   Every driver is a chip toggle (top 5 on by default, per session); toggling

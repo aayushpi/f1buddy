@@ -5,7 +5,6 @@ import type { TrackStatus } from '../api/types'
 const TABS: { id: ActiveView; label: string; icon: string }[] = [
   { id: 'timing', label: 'Timing', icon: '◳' },
   { id: 'map', label: 'Track Map', icon: '◎' },
-  { id: 'speedmap', label: 'Speed Map', icon: '◉' },
   { id: 'gap', label: 'Gap to Leader', icon: '⋰' },
   { id: 'telemetry', label: 'Telemetry', icon: '∿' },
   { id: 'strategy', label: 'Strategy', icon: '▤' },

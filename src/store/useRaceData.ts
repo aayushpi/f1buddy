@@ -15,7 +15,6 @@ export type Connection = 'idle' | 'connecting' | 'live' | 'replay' | 'error'
 export type ActiveView =
   | 'timing'
   | 'map'
-  | 'speedmap'
   | 'gap'
   | 'telemetry'
   | 'strategy'

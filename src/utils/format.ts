@@ -64,9 +64,20 @@ const COMPOUND_COLOR: Record<string, string> = {
   WET: '#2f8fff',
 }
 
-export function compoundColor(compound: string | null | undefined): string {
-  if (!compound) return '#7a8699'
-  return COMPOUND_COLOR[compound.toUpperCase()] ?? '#7a8699'
+// Vivid variants for tyres that started (near-)fresh, so a new set pops next to
+// a scrubbed/used one.
+const COMPOUND_COLOR_BRIGHT: Record<string, string> = {
+  SOFT: '#ff5d6c',
+  MEDIUM: '#ffe24d',
+  HARD: '#ffffff',
+  INTERMEDIATE: '#5ff07a',
+  WET: '#5aa9ff',
+}
+
+export function compoundColor(compound: string | null | undefined, bright = false): string {
+  if (!compound) return bright ? '#9aa6bd' : '#7a8699'
+  const table = bright ? COMPOUND_COLOR_BRIGHT : COMPOUND_COLOR
+  return table[compound.toUpperCase()] ?? (bright ? '#9aa6bd' : '#7a8699')
 }
 
 /** "HH:MM:SS" from an ISO date string. */

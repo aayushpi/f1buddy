@@ -14,7 +14,6 @@ import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
 import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
 import { TrackMap } from './components/views/TrackMap'
-import { SpeedMap } from './components/views/SpeedMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
@@ -111,7 +110,7 @@ export default function App() {
     return { key: selection.sessionKey, startSec: 0, speed: 1 }
   }, [selection, simLiveUrl])
 
-  const { snapshot, connection, error, replay, trackOutline, trackChannels } = useRaceData({
+  const { snapshot, connection, error, replay, trackOutline } = useRaceData({
     mode: selection ? 'live' : 'idle',
     config,
     sessionKey: selection ? selection.sessionKey : 'latest',
@@ -179,11 +178,6 @@ export default function App() {
       /* ignore */
     }
   }, [settings, lapWindow, selected, activeView, notify, trackAlerts])
-
-  // A session picked from the Settings browser replays as live-sim.
-  const loadSession = (key: number) => {
-    setSelection({ mode: 'sim', sessionKey: key })
-  }
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
@@ -276,12 +270,6 @@ export default function App() {
             />
           </div>
         )
-      case 'speedmap':
-        return (
-          <div className="viewbody">
-            <SpeedMap channels={trackChannels} />
-          </div>
-        )
       case 'gap':
         return (
           <div className="viewbody">
@@ -370,10 +358,6 @@ export default function App() {
           settings={settings}
           onClose={() => setSettingsOpen(false)}
           onApply={setSettings}
-          config={config}
-          sessionKey="latest"
-          activeLabel={null}
-          onLoadSession={loadSession}
         />
       </>
     )
@@ -407,14 +391,6 @@ export default function App() {
         settings={settings}
         onClose={() => setSettingsOpen(false)}
         onApply={setSettings}
-        config={config}
-        sessionKey={selection.sessionKey}
-        activeLabel={
-          snapshot?.race
-            ? `${snapshot.race.meetingName || snapshot.race.circuit} · ${snapshot.race.sessionName}`
-            : null
-        }
-        onLoadSession={loadSession}
       />
 
       {liveChoiceOpen && replay?.live && (

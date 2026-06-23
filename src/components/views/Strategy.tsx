@@ -35,20 +35,28 @@ function StintGantt({ stints, maxLap }: { stints: StintRow[]; maxLap: number }) 
               {row.acronym}
             </span>
             <div className="gantt-track">
-              {row.segments.map((s, i) => (
-                <div
-                  key={i}
-                  className="gantt-seg"
-                  style={{
-                    width: `${(s.laps / maxLap) * 100}%`,
-                    ['--tyre' as string]: compoundColor(s.compound),
-                  }}
-                  title={`${s.compound ?? '?'} · laps ${s.lapStart}-${s.lapEnd}`}
-                >
-                  <span className="seg-c">{compoundLabel(s.compound)}</span>
-                  <span className="seg-l">{s.laps}</span>
-                </div>
-              ))}
+              {row.segments.map((s, i) => {
+                // tyre_age_at_start: 0/1 = (near-)fresh → bright; >1 = used → normal.
+                const fresh = s.ageAtStart < 2
+                // Tyre life = laps already on the set + laps run this stint.
+                const life = s.ageAtStart + s.laps
+                return (
+                  <div
+                    key={i}
+                    className={`gantt-seg ${fresh ? 'fresh' : 'used'}`}
+                    style={{
+                      width: `${(s.laps / maxLap) * 100}%`,
+                      ['--tyre' as string]: compoundColor(s.compound, fresh),
+                    }}
+                    title={`${s.compound ?? '?'} · laps ${s.lapStart}-${s.lapEnd} · started ${
+                      fresh ? 'fresh' : `${s.ageAtStart} laps old`
+                    } · ${life} laps tyre life`}
+                  >
+                    <span className="seg-c">{compoundLabel(s.compound)}</span>
+                    <span className="seg-l">{life}L</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         ))}
