@@ -1547,6 +1547,118 @@ button {
 }
 @keyframes notice-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
+/* ============================ Pit Simulator ============================ */
+.ps-panel { display: flex; flex-direction: column; min-height: 0; }
+.ps-circuit { color: var(--text); font-weight: 700; letter-spacing: 0.04em; text-transform: none; }
+.ps-losses { display: flex; gap: 6px; margin-left: auto; }
+.ps-loss-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+}
+.ps-loss-chip.green { color: var(--green); border-color: rgba(34, 224, 122, 0.4); }
+.ps-loss-chip.vsc { color: var(--yellow); border-color: rgba(246, 211, 63, 0.4); }
+.ps-loss-chip.sc { color: var(--amber); border-color: rgba(255, 157, 47, 0.4); }
+.ps-clear {
+  margin-left: 12px;
+  background: rgba(255, 59, 70, 0.12);
+  border: 1px solid rgba(255, 59, 70, 0.4);
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.ps-cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px; flex: 1 1 auto; min-height: 0; padding: 0 12px 12px; }
+.ps-col { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+.ps-col-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px 8px; }
+.ps-col-title { font-size: 15px; font-weight: 800; letter-spacing: 0.01em; }
+.ps-col-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+
+.ps-head, .ps-row {
+  display: grid;
+  grid-template-columns: 28px 1.4fr 72px 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.ps-head.live, .ps-row.live, .ps-col:first-child .ps-head, .ps-col:first-child .ps-row {
+  grid-template-columns: 28px 1.2fr 64px 64px minmax(150px, 1fr);
+}
+.ps-head.proj, .ps-col:last-child .ps-head, .ps-col:last-child .ps-row {
+  grid-template-columns: 28px 1.4fr 72px 72px 44px;
+}
+.ps-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.ps-head > div { text-align: center; }
+.ps-head .ps-c-driver { text-align: left; }
+.ps-head .ps-c-actions, .ps-head .ps-c-move { text-align: center; }
+
+.ps-body { overflow-y: auto; min-height: 0; flex: 1 1 auto; padding: 4px 0 6px; }
+.ps-row {
+  height: 40px;
+  border-bottom: 1px solid rgba(120, 160, 255, 0.05);
+  border-left: 3px solid transparent;
+}
+.ps-row.pitting { border-left-color: var(--team); background: rgba(140, 170, 255, 0.05); }
+
+.ps-pos { font-family: var(--mono); font-weight: 800; font-size: 14px; text-align: center; color: var(--text-dim); }
+.ps-driver { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ps-acr { font-weight: 800; font-size: 14px; }
+.ps-team { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ps-gap { text-align: center; font-size: 13px; color: var(--text-dim); }
+.ps-gap.clear-air { color: var(--green); font-weight: 700; }
+
+.ps-actions { display: flex; gap: 5px; justify-content: center; }
+.ps-btn {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-strong);
+  color: var(--text-dim);
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ps-btn:hover { border-color: var(--accent); }
+.ps-btn.green.on { background: rgba(34, 224, 122, 0.18); color: var(--green); border-color: var(--green); }
+.ps-btn.vsc.on { background: rgba(246, 211, 63, 0.18); color: var(--yellow); border-color: var(--yellow); }
+.ps-btn.sc.on { background: rgba(255, 157, 47, 0.18); color: var(--amber); border-color: var(--amber); }
+
+.ps-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.ps-tag.green { color: var(--green); background: rgba(34, 224, 122, 0.14); }
+.ps-tag.vsc { color: var(--yellow); background: rgba(246, 211, 63, 0.14); }
+.ps-tag.sc { color: var(--amber); background: rgba(255, 157, 47, 0.14); }
+
+.ps-move { text-align: center; font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--muted); }
+.ps-move.up { color: var(--green); }
+.ps-move.down { color: var(--red); }
+
 /* ============================================================
    Phone view (≤640px)
    The dashboard is built for iPad landscape; on a phone we keep
@@ -1654,4 +1766,12 @@ button {
   /* ---- Gap chart: tighter header ---- */
   .gap-header { flex-direction: column; gap: 8px; padding: 12px 14px 4px; }
   .gap-title { font-size: 17px; }
+
+  /* ---- Pit simulator: stack the two columns ---- */
+  .ps-losses { flex-wrap: wrap; }
+  .ps-cols { grid-template-columns: 1fr; gap: 8px; padding: 0 8px 8px; overflow-y: auto; }
+  .ps-col { flex: 0 0 auto; }
+  .ps-col .ps-body { max-height: 42vh; }
+  .ps-col:first-child .ps-head, .ps-col:first-child .ps-row { grid-template-columns: 24px 1fr 52px 52px minmax(120px, 1.2fr); }
+  .ps-btn { padding: 5px 6px; }
 }

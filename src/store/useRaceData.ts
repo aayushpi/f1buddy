@@ -17,6 +17,7 @@ export type ActiveView =
   | 'gap'
   | 'telemetry'
   | 'strategy'
+  | 'pit'
   | 'control'
   | 'weather'
 

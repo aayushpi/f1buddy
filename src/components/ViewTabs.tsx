@@ -9,6 +9,7 @@ const TABS: { id: ActiveView; label: string; icon: string }[] = [
   { id: 'gap', label: 'Gap to Leader', icon: '⋰' },
   { id: 'telemetry', label: 'Telemetry', icon: '∿' },
   { id: 'strategy', label: 'Strategy', icon: '▤' },
+  { id: 'pit', label: 'Pit Simulator', icon: '⏱' },
   { id: 'control', label: 'Race Control', icon: '⚑' },
   { id: 'weather', label: 'Weather', icon: '☀' },
 ]

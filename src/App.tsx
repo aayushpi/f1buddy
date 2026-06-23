@@ -17,10 +17,12 @@ import { SpeedMap } from './components/views/SpeedMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
+import { PitSimulator } from './components/views/PitSimulator'
 import { RaceControlView } from './components/views/RaceControlView'
 import { WeatherView } from './components/views/WeatherView'
 import { useRaceData, type ActiveView, type SimLive } from './store/useRaceData'
 import { defaultConfig } from './api/openf1'
+import { pitLossFor } from './data/pitTimes'
 
 // Dev rehearsal: ?simlive=<session_key>[&simspeed=N][&simstart=seconds] replays a
 // finished race as if it were live. See docs/proposals/simlive.md.
@@ -270,6 +272,16 @@ export default function App() {
               results={snapshot.results}
               currentLap={snapshot.race.currentLap}
               finished={snapshot.race.finished}
+            />
+          </div>
+        )
+      case 'pit':
+        return (
+          <div className="viewbody">
+            <PitSimulator
+              drivers={snapshot.drivers}
+              pitLoss={pitLossFor(snapshot.race.circuit, snapshot.race.countryName, snapshot.race.meetingName)}
+              circuit={snapshot.race.meetingName || snapshot.race.circuit}
             />
           </div>
         )
