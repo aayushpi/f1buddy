@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { DriverState } from '../../api/types'
 import type { PitLoss } from '../../data/pitTimes'
@@ -40,6 +40,16 @@ interface ProjectedRow {
   leaderGap: number | null
   pitted: PitType | null
   delta: number | null // places gained (+) / lost (−) vs the live order
+}
+
+interface Link {
+  num: number
+  colour: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  moved: boolean
 }
 
 function GapCell({ value, label }: { value: number | null; label?: string }) {
@@ -118,6 +128,80 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
 
   const pitCount = pits.size
 
+  // Per-driver metadata for the connector lines (colour + whether they moved).
+  const meta = useMemo(() => {
+    const m = new Map<number, { colour: string; moved: boolean }>()
+    for (const r of projected) m.set(r.d.driverNumber, { colour: teamHex(r.d.teamColour), moved: !!r.delta })
+    return m
+  }, [projected])
+
+  // ---- Connector lines between the two columns ----
+  // Each driver gets a line from their live row to their projected row. With no
+  // simulation every line is horizontal; once a stop drops a driver down the
+  // order their line slopes to the new position. Positions are measured from the
+  // DOM so the lines stay glued to the rows through scrolling and the reorder
+  // spring.
+  const linksRef = useRef<SVGSVGElement>(null)
+  const leftRows = useRef(new Map<number, HTMLDivElement>())
+  const rightRows = useRef(new Map<number, HTMLDivElement>())
+  const leftBody = useRef<HTMLDivElement>(null)
+  const rightBody = useRef<HTMLDivElement>(null)
+  const [links, setLinks] = useState<Link[]>([])
+
+  const recompute = useCallback(() => {
+    const svg = linksRef.current
+    if (!svg) return
+    const box = svg.getBoundingClientRect()
+    if (box.width === 0) return
+    const out: Link[] = []
+    leftRows.current.forEach((lel, num) => {
+      const rel = rightRows.current.get(num)
+      if (!rel) return
+      const a = lel.getBoundingClientRect()
+      const b = rel.getBoundingClientRect()
+      const info = meta.get(num)
+      out.push({
+        num,
+        colour: info?.colour ?? '#8a93a6',
+        x1: a.right - box.left,
+        y1: a.top + a.height / 2 - box.top,
+        x2: b.left - box.left,
+        y2: b.top + b.height / 2 - box.top,
+        moved: info?.moved ?? false,
+      })
+    })
+    setLinks(out)
+  }, [meta])
+
+  // Recompute on layout / data changes.
+  useLayoutEffect(() => {
+    recompute()
+  }, [recompute, projected])
+
+  // Track resize and independent body scrolling.
+  useEffect(() => {
+    const onChange = () => recompute()
+    window.addEventListener('resize', onChange)
+    const bodies = [leftBody.current, rightBody.current]
+    bodies.forEach((b) => b?.addEventListener('scroll', onChange, { passive: true }))
+    return () => {
+      window.removeEventListener('resize', onChange)
+      bodies.forEach((b) => b?.removeEventListener('scroll', onChange))
+    }
+  }, [recompute])
+
+  // Follow the reorder spring for a few hundred ms after a stop is toggled.
+  useEffect(() => {
+    let raf = 0
+    const start = performance.now()
+    const tick = (t: number) => {
+      recompute()
+      if (t - start < 650) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [pits, recompute])
+
   return (
     <div className="panel ps-panel">
       <div className="panel-title">
@@ -150,7 +234,7 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
             <div>Leader</div>
             <div className="ps-c-actions">Simulate stop</div>
           </div>
-          <div className="ps-body">
+          <div className="ps-body" ref={leftBody}>
             <AnimatePresence>
               {live.map((d) => {
                 const active = pits.get(d.driverNumber) ?? null
@@ -161,6 +245,10 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
                   <motion.div
                     layout
                     key={d.driverNumber}
+                    ref={(el: HTMLDivElement | null) => {
+                      if (el) leftRows.current.set(d.driverNumber, el)
+                      else leftRows.current.delete(d.driverNumber)
+                    }}
                     transition={{ type: 'spring', stiffness: 520, damping: 42 }}
                     className={`ps-row ${active ? 'pitting' : ''}`}
                     style={{ ['--team' as string]: team }}
@@ -193,6 +281,24 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
           </div>
         </div>
 
+        {/* ---- Connector lines ---- */}
+        <svg className="ps-links" ref={linksRef} preserveAspectRatio="none">
+          {links.map((l) => {
+            const dx = Math.max(18, (l.x2 - l.x1) * 0.5)
+            return (
+              <g key={l.num} className={l.moved ? 'moved' : ''}>
+                <path
+                  d={`M${l.x1},${l.y1} C${l.x1 + dx},${l.y1} ${l.x2 - dx},${l.y2} ${l.x2},${l.y2}`}
+                  stroke={l.colour}
+                  fill="none"
+                />
+                <circle cx={l.x1} cy={l.y1} r={l.moved ? 3 : 2} fill={l.colour} />
+                <circle cx={l.x2} cy={l.y2} r={l.moved ? 3 : 2} fill={l.colour} />
+              </g>
+            )
+          })}
+        </svg>
+
         {/* ---- Column two: projected after pit ---- */}
         <div className="ps-col">
           <div className="ps-col-head">
@@ -206,7 +312,7 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
             <div>Leader</div>
             <div className="ps-c-move">±</div>
           </div>
-          <div className="ps-body">
+          <div className="ps-body" ref={rightBody}>
             <AnimatePresence>
               {projected.map((r) => {
                 const team = teamHex(r.d.teamColour)
@@ -215,6 +321,10 @@ export function PitSimulator({ drivers, pitLoss, circuit }: Props) {
                   <motion.div
                     layout
                     key={r.d.driverNumber}
+                    ref={(el: HTMLDivElement | null) => {
+                      if (el) rightRows.current.set(r.d.driverNumber, el)
+                      else rightRows.current.delete(r.d.driverNumber)
+                    }}
                     transition={{ type: 'spring', stiffness: 520, damping: 42 }}
                     className={`ps-row ${r.pitted ? `pitting ${r.pitted}` : ''}`}
                     style={{ ['--team' as string]: team }}
