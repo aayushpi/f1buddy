@@ -47,6 +47,8 @@ interface Persisted {
   activeView: ActiveView
   // Drivers opted into race-control + radio popups (a stable per-season pref).
   notify: number[]
+  // Critical track-wide bulletins (flags / safety car) pop up. On by default.
+  trackAlerts: boolean
 }
 
 const DEFAULTS: Persisted = {
@@ -55,6 +57,7 @@ const DEFAULTS: Persisted = {
   selected: [],
   activeView: 'timing',
   notify: [],
+  trackAlerts: true,
 }
 
 function loadState(): Persisted {
@@ -76,6 +79,8 @@ export default function App() {
   const [gapSelected, setGapSelected] = useState<Set<number>>(new Set())
   // Drivers the user wants race-control + radio popups for.
   const [notify, setNotify] = useState<Set<number>>(new Set(initial.notify))
+  // Critical track-wide bulletins (flags / safety car) popups, on by default.
+  const [trackAlerts, setTrackAlerts] = useState(initial.trackAlerts)
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const gapSeeded = useRef<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -142,7 +147,7 @@ export default function App() {
   // Live alerts: fastest laps/sectors always; race-control + radio popups only
   // for drivers the user opted into. The full record stays in the Race Control
   // tab. Reset per session.
-  const { notices, dismiss } = useRaceNotices(snapshot, sessionId, notify)
+  const { notices, dismiss } = useRaceNotices(snapshot, sessionId, notify, trackAlerts)
 
   // When an in-progress race finishes loading, ask once how to start it. Default
   // is spoiler-free (the engine already begins at lights-out); jumping to live
@@ -167,13 +172,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView, notify: [...notify] }
+    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView, notify: [...notify], trackAlerts }
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(data))
     } catch {
       /* ignore */
     }
-  }, [settings, lapWindow, selected, activeView, notify])
+  }, [settings, lapWindow, selected, activeView, notify, trackAlerts])
 
   // A session picked from the Settings browser replays as live-sim.
   const loadSession = (key: number) => {
@@ -336,6 +341,8 @@ export default function App() {
               drivers={snapshot.drivers}
               notify={notify}
               onToggleNotify={toggleNotify}
+              trackAlerts={trackAlerts}
+              onToggleTrackAlerts={() => setTrackAlerts((v) => !v)}
             />
           </div>
         )

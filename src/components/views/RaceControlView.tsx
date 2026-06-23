@@ -10,6 +10,9 @@ interface Props {
   // Drivers the user wants race-control + radio popups for.
   notify: Set<number>
   onToggleNotify: (n: number) => void
+  // Critical track-wide bulletins (flags / safety car) popups, on by default.
+  trackAlerts: boolean
+  onToggleTrackAlerts: () => void
 }
 
 function flagClass(entry: RaceControlEntry): string {
@@ -47,7 +50,16 @@ function RadioPlayer({ clip }: { clip: RadioClip }) {
   )
 }
 
-export function RaceControlView({ log, overtakes, radios, drivers, notify, onToggleNotify }: Props) {
+export function RaceControlView({
+  log,
+  overtakes,
+  radios,
+  drivers,
+  notify,
+  onToggleNotify,
+  trackAlerts,
+  onToggleTrackAlerts,
+}: Props) {
   return (
     <div className="control-view">
       <div className="panel rc-notify">
@@ -55,6 +67,13 @@ export function RaceControlView({ log, overtakes, radios, drivers, notify, onTog
           <span className="dot" />
           Notify me about
           <span className="rc-notify-hint">race control &amp; radio for selected drivers</span>
+          <button
+            className={`chip rc-track-toggle ${trackAlerts ? 'on' : ''}`}
+            onClick={onToggleTrackAlerts}
+            title="Critical track-wide flags & safety car"
+          >
+            <span className="swatch" />⚑ Track-wide flags
+          </button>
         </div>
         <div className="driver-chips">
           {drivers.map((d) => (

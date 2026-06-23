@@ -831,7 +831,8 @@ button {
 .control-view { flex: 1 1 auto; display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: auto 1fr; gap: 12px; min-height: 0; }
 .rc-notify { grid-column: 1 / -1; }
 .rc-notify .panel-title { padding-bottom: 8px; }
-.rc-notify-hint { margin-left: auto; text-transform: none; letter-spacing: 0.02em; font-weight: 600; color: var(--muted); }
+.rc-notify-hint { margin-left: 10px; text-transform: none; letter-spacing: 0.02em; font-weight: 600; color: var(--muted); }
+.rc-track-toggle { margin-left: auto; --team: var(--amber); text-transform: none; cursor: pointer; }
 .rc-notify .driver-chips { max-height: 76px; }
 .control-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .rc-log { display: flex; flex-direction: column; min-height: 0; }

@@ -87,8 +87,11 @@ Auto-dismissing popovers, stacked newest-at-bottom so a burst reads in order:
   from ALL CAPS to sentence case, preserving acronyms (DRS/VSC), driver codes
   `(VER)` and positions `P4`.
 
+- **Track-wide flags / safety car** — critical track-wide bulletins pop up via a
+  separate **"Track-wide flags"** toggle (on by default) in the same panel.
+
 The full history always remains in the Race Control tab; the nav status dot
-still reflects track-wide flags. The opt-in set persists across sessions.
+still reflects track-wide flags. Both preferences persist across sessions.
 
 ## 6. Chrome
 
