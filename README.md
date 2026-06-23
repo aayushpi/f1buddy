@@ -74,12 +74,14 @@ The app opens on a **home screen** built from the season calendar:
   **Replay the last race** shortcut, and **Load a past session** — a full-screen
   picker (year → Grand Prix → session).
 
-A **live** session plays in real time; a **historical** pick plays as *live-sim*
-(replayed as if live, from lights-out). Either way it runs through one engine: a
-virtual clock with **play/pause, 1–12× speed, a scrubber with per-lap markers you
-can tap to jump (pre-race / formation-lap segments shaded), and ‹ › lap-step
-buttons**. Every view reflects the exact state at the playback moment, and the
-clock only ever reveals data up to that point — so you never get spoiled.
+A **live** session plays in real time; a **historical** pick loads the **full
+race** (the whole timeline available to scrub), with a **Simulate live** toggle
+in the picker to instead replay it as if live for testing. Either way it runs
+through one engine: a virtual clock with **play/pause, 1–12× speed, a scrubber
+with per-lap markers you can tap to jump (pre-race / formation-lap segments
+shaded), and ‹ › lap-step buttons**. Every view reflects the exact state at the
+playback moment, and the clock only ever reveals data up to that point — so you
+never get spoiled.
 
 - **Start from the beginning, no spoilers.** Entering an in-progress (or
   live-sim) race begins at lights-out, not the live edge. A **● LIVE** button

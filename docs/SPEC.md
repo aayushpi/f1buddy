@@ -50,8 +50,11 @@ second):
   session).
 
 Routing: a **live** pick loads real-time live mode; a **historical** pick loads
-as **live-sim** (replayed as if live from lights-out). The ⌂ button on the nav
-returns to the home screen.
+the **full race** (whole timeline available to scrub) by default. A **Simulate
+live** toggle in the picker instead replays a past session as if live (a
+real-time growing edge from lights-out) for testing the live flow. Each Grand
+Prix card shows a mini circuit-outline SVG (country-flag fallback). The ⌂ button
+on the nav returns to the home screen.
 
 ## 3a. Watching modes
 

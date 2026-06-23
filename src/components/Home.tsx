@@ -7,7 +7,8 @@ import { SessionPicker } from './SessionPicker'
 interface Props {
   config: OpenF1Config
   onEnterLive: (sessionKey: number) => void
-  onReplay: (sessionKey: number) => void
+  // simulate=true replays the session as if live; false loads the full race.
+  onReplay: (sessionKey: number, simulate: boolean) => void
   onOpenSettings: () => void
 }
 
@@ -49,9 +50,9 @@ export function Home({ config, onEnterLive, onReplay, onOpenSettings }: Props) {
       <SessionPicker
         config={config}
         onClose={() => setPickerOpen(false)}
-        onPick={(key) => {
+        onPick={(key, simulate) => {
           setPickerOpen(false)
-          onReplay(key)
+          onReplay(key, simulate)
         }}
       />
     )
@@ -129,7 +130,7 @@ export function Home({ config, onEnterLive, onReplay, onOpenSettings }: Props) {
           {cal.lastRace && (
             <motion.button
               className="home-action"
-              onClick={() => onReplay(cal.lastRace!.sessionKey)}
+              onClick={() => onReplay(cal.lastRace!.sessionKey, false)}
               whileTap={{ scale: 0.98 }}
             >
               <span className="home-action-icon">↺</span>

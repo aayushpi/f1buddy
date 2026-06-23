@@ -1803,7 +1803,7 @@ button {
 }
 .picker-back:hover { border-color: var(--accent); color: var(--text); }
 .picker-title { font-size: 20px; font-weight: 800; }
-.picker-years { margin-left: auto; }
+.picker-years { margin-left: 12px; }
 
 .picker-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .picker-note { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 24px 4px; font-size: 14px; }
@@ -1828,9 +1828,33 @@ button {
   transition: border-color 0.14s, background 0.14s;
 }
 .gp-card:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.07); }
+.gp-thumb {
+  height: 88px;
+  margin-bottom: 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: rgba(140, 170, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.gp-thumb.flag { font-size: 42px; }
+.gp-track { width: 100%; height: 100%; padding: 10px; display: block; }
+.gp-track path {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.gp-card:hover .gp-track path { stroke: var(--text); }
 .gp-country { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .gp-name { font-size: 17px; font-weight: 800; }
 .gp-date { font-size: 12px; color: var(--text-dim); }
+
+.pick-sim { margin-left: auto; --team: var(--accent); cursor: pointer; }
+.picker-foot { flex: 0 0 auto; padding: 12px 4px 0; font-size: 12px; color: var(--muted); }
 
 .picker-sessions { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .ses-card {

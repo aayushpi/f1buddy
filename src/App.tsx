@@ -90,22 +90,24 @@ export default function App() {
   const livePromptKey = useRef<string | null>(null)
 
   // What the user picked on the home screen. null ⇒ show the landing page.
-  //  - live: a session in progress → real-time, re-fetching live mode.
-  //  - sim:  a finished session → replayed as if live (simLive).
+  //  - mode 'live': a session in progress → real-time, re-fetching live mode.
+  //  - mode 'past': a finished session → a full replay (whole timeline available).
+  //    `simulate` opts that past session into the as-if-live engine instead
+  //    (a real-time growing edge), for testing the live flow.
   const simLiveUrl = useMemo(parseSimLive, [])
-  const [selection, setSelection] = useState<{ mode: 'live' | 'sim'; sessionKey: number } | null>(
-    () => (simLiveUrl ? { mode: 'sim', sessionKey: simLiveUrl.key } : null),
-  )
+  const [selection, setSelection] = useState<
+    { mode: 'live' | 'past'; sessionKey: number; simulate: boolean } | null
+  >(() => (simLiveUrl ? { mode: 'past', sessionKey: simLiveUrl.key, simulate: true } : null))
 
   const config = useMemo(
     () => ({ baseUrl: settings.baseUrl, apiKey: settings.apiKey || undefined }),
     [settings.baseUrl, settings.apiKey],
   )
 
-  // A historical pick plays as live-sim from lights-out (real-time growing edge);
-  // the ?simlive= URL keeps its own speed/start for mid-week rehearsal.
+  // simLive is engaged only when a past session opts into "simulate live".
+  // The ?simlive= URL keeps its own speed/start for mid-week rehearsal.
   const simLive = useMemo<SimLive | null>(() => {
-    if (!selection || selection.mode !== 'sim') return null
+    if (!selection || !selection.simulate) return null
     if (simLiveUrl && simLiveUrl.key === selection.sessionKey) return simLiveUrl
     return { key: selection.sessionKey, startSec: 0, speed: 1 }
   }, [selection, simLiveUrl])
@@ -132,7 +134,9 @@ export default function App() {
     }
   }, [snapshot, selected.size])
 
-  const sessionId = selection ? `${selection.mode}:${selection.sessionKey}` : 'home'
+  const sessionId = selection
+    ? `${selection.mode}:${selection.sessionKey}:${selection.simulate}`
+    : 'home'
 
   // Seed the Gap-to-Leader view with the top 5 once per session, then leave it
   // entirely under user control (they can toggle any driver, including to none).
@@ -349,8 +353,8 @@ export default function App() {
       <>
         <Home
           config={config}
-          onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key })}
-          onReplay={(key) => setSelection({ mode: 'sim', sessionKey: key })}
+          onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key, simulate: false })}
+          onReplay={(key, simulate) => setSelection({ mode: 'past', sessionKey: key, simulate })}
           onOpenSettings={() => setSettingsOpen(true)}
         />
         <SettingsDrawer

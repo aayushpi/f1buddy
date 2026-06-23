@@ -1,15 +1,34 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { api, type OpenF1Config } from '../api/openf1'
+import { findCircuit } from '../data/circuits'
 import type { ApiMeeting, ApiSession } from '../api/types'
 
 interface Props {
   config: OpenF1Config
-  onPick: (sessionKey: number) => void
+  // simulate=true replays the picked session as if live; false loads the full race.
+  onPick: (sessionKey: number, simulate: boolean) => void
   onClose: () => void
 }
 
 const YEARS = [2026, 2025, 2024, 2023]
+
+// Country name → ISO-3166 alpha-2, for the flag fallback when no circuit matches.
+const ISO2: Record<string, string> = {
+  Australia: 'AU', Austria: 'AT', Azerbaijan: 'AZ', Bahrain: 'BH', Belgium: 'BE',
+  Brazil: 'BR', Canada: 'CA', China: 'CN', France: 'FR', Germany: 'DE', Hungary: 'HU',
+  India: 'IN', Italy: 'IT', Japan: 'JP', Malaysia: 'MY', Mexico: 'MX', Monaco: 'MC',
+  Netherlands: 'NL', Portugal: 'PT', Qatar: 'QA', Russia: 'RU', Singapore: 'SG',
+  'Saudi Arabia': 'SA', 'South Africa': 'ZA', Spain: 'ES', Turkey: 'TR',
+  'United Arab Emirates': 'AE', 'United Kingdom': 'GB', 'Great Britain': 'GB',
+  'United States': 'US', USA: 'US', Argentina: 'AR',
+}
+
+function countryFlag(name: string | undefined): string {
+  const code = name ? ISO2[name] : undefined
+  if (!code) return '🏁'
+  return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+}
 
 function fmtDate(iso: string | undefined): string {
   if (!iso) return ''
@@ -27,8 +46,43 @@ function sessionRank(s: ApiSession): number {
   return 3
 }
 
+// A mini circuit outline from the local library, or the country flag if the
+// track isn't recognised. The dataset's y is screen-down, so flip it upright.
+function TrackThumb({ meeting }: { meeting: ApiMeeting }) {
+  const circuit = findCircuit(
+    meeting.circuit_short_name,
+    meeting.location,
+    meeting.country_name,
+    meeting.meeting_name,
+  )
+  if (!circuit || circuit.points.length < 8) {
+    return <div className="gp-thumb flag">{countryFlag(meeting.country_name)}</div>
+  }
+  const pts = circuit.points.map(([x, y]) => [x, -y] as const)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of pts) {
+    if (x < minX) minX = x
+    if (x > maxX) maxX = x
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+  }
+  const w = maxX - minX || 1
+  const h = maxY - minY || 1
+  const pad = Math.max(w, h) * 0.1
+  const vb = `${minX - pad} ${minY - pad} ${w + pad * 2} ${h + pad * 2}`
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
+  return (
+    <div className="gp-thumb">
+      <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" className="gp-track">
+        <path d={d} fill="none" />
+      </svg>
+    </div>
+  )
+}
+
 export function SessionPicker({ config, onPick, onClose }: Props) {
   const [year, setYear] = useState(2026)
+  const [simulate, setSimulate] = useState(false)
   const [meetings, setMeetings] = useState<ApiMeeting[]>([])
   const [meetingsState, setMeetingsState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [selected, setSelected] = useState<ApiMeeting | null>(null)
@@ -85,6 +139,13 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
           ‹ {selected ? 'All Grands Prix' : 'Home'}
         </button>
         <div className="picker-title">{selected ? selected.meeting_name : 'Load a past session'}</div>
+        <button
+          className={`chip pick-sim ${simulate ? 'on' : ''}`}
+          onClick={() => setSimulate((v) => !v)}
+          title="Replay as if live (real-time growing edge) instead of loading the full race"
+        >
+          <span className="swatch" />◉ Simulate live
+        </button>
         <div className="seg picker-years">
           {YEARS.map((y) => (
             <button key={y} className={y === year ? 'active' : ''} onClick={() => setYear(y)}>
@@ -115,6 +176,7 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
                 onClick={() => setSelected(m)}
                 whileTap={{ scale: 0.97 }}
               >
+                <TrackThumb meeting={m} />
                 <span className="gp-country">{m.country_name}</span>
                 <span className="gp-name">{m.meeting_name}</span>
                 <span className="gp-date">{fmtDate(m.date_start)}</span>
@@ -138,13 +200,18 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
                 <motion.button
                   key={s.session_key}
                   className={`ses-card ${s.session_type?.toLowerCase() === 'race' ? 'race' : ''}`}
-                  onClick={() => onPick(s.session_key)}
+                  onClick={() => onPick(s.session_key, simulate)}
                   whileTap={{ scale: 0.97 }}
                 >
                   <span className="ses-name">▶ {s.session_name}</span>
                   <span className="ses-date">{fmtDate(s.date_start)}</span>
                 </motion.button>
               ))}
+          </div>
+          <div className="picker-foot">
+            {simulate
+              ? 'Simulate live: the session replays from lights-out as a real-time growing edge.'
+              : 'Full replay: the whole session is available to scrub and fast-forward.'}
           </div>
         </div>
       )}
