@@ -35,7 +35,7 @@ export function SettingsDrawer({ open, settings, onClose, onApply }: Props) {
           <label>API Base URL</label>
           <input value={draft.baseUrl} onChange={(e) => set({ baseUrl: e.target.value.trim() })} />
           <span className="hint">
-            Default routes through the bundled proxy in production and OpenF1 directly in local dev.
+            Default: https://api.openf1.org/v1
           </span>
         </div>
 
@@ -47,8 +47,8 @@ export function SettingsDrawer({ open, settings, onClose, onApply }: Props) {
             onChange={(e) => set({ apiKey: e.target.value.trim() })}
           />
           <span className="hint">
-            Live deployments keep the key server-side; this is only a local override, sent as a
-            Bearer token.
+            OpenF1 serves free historical data (2023+). True real-time live timing needs a paid
+            key — add it here and it is sent as a Bearer token.
           </span>
         </div>
 

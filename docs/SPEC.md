@@ -7,13 +7,11 @@ API. Designed for iPad landscape, responsive down to phones.
 
 - **Source:** OpenF1 REST. Historical data (2023+) is free; live data (the window
   from 30 min before a session to 30 min after it ends) needs a paid key.
-- **Caching proxy:** holds the API key server-side, caches responses (~2 s TTL)
-  and coalesces identical/concurrent requests, so one key serves many viewers (a
-  single browser otherwise exceeds the 60 req/min paid cap). Two forms, same
-  logic: `server/proxy.mjs` (standalone Node, via `VITE_OPENF1_BASE_URL`) and
-  `api/proxy.js` via a `/api/v1/*` rewrite (Vercel serverless). On Vercel the app calls `/api/v1/...`
-  same-origin; set `OPENF1_API_KEY` in the project env and live data works with
-  no client config or key in the browser.
+- **API key:** the app calls OpenF1 directly; add a key in Settings → API Key
+  (sent as a `Bearer` token) for live real-time. An optional caching proxy
+  (`server/proxy.mjs`) can hold the key server-side and coalesce requests so one
+  key serves many viewers; point the app at it via `VITE_OPENF1_BASE_URL`.
+  (A hosted same-origin proxy is planned in a separate branch.)
 - **Derivation:** all raw feeds are normalised by `utils/derive.ts` into one
   `RaceSnapshot` that every view renders. `buildLapMarkers` / `rawTimeBounds`
   define the timeline; `filterRawByTime` reveals the snapshot at a playback time.

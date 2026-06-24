@@ -56,12 +56,11 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
 - **All historical data (2023+) is free and needs no key** — including
   `car_data` telemetry and `location` track positions. Replaying any past race
   costs nothing.
-- **Only the live, real-time stream requires a paid OpenF1 subscription.** The
-  recommended setup keeps the key **server-side**: deploy to Vercel and set
-  `OPENF1_API_KEY` in the project env. The bundled serverless proxy
-  (`api/proxy.js`) injects it as a `Bearer` token and the app calls it
-  same-origin at `/api/v1`, so the key never reaches the browser and one key
-  serves every viewer. (Settings → API Key still works as a local override.)
+- **Only the live, real-time stream requires a paid OpenF1 subscription.** Add
+  your key in **Settings → API Key** (sent as a `Bearer` token) to drive Live
+  mode off an in-progress session with minimal delay. To keep the key
+  server-side and let one key serve many viewers, run the optional caching proxy
+  (`server/proxy.mjs`) and point the app at it via `VITE_OPENF1_BASE_URL`.
 
 ### How it plays
 
