@@ -11,6 +11,8 @@
 // The app calls this same-origin at /api/v1/... (see src/api/openf1.ts), so no
 // CORS dance is needed. Set OPENF1_API_KEY in the Vercel project env for live
 // data; without it only free historical data is available.
+//
+// ESM is fine here because package.json declares "type": "module".
 
 const UPSTREAM = (process.env.OPENF1_BASE || 'https://api.openf1.org').replace(/\/$/, '')
 const API_KEY = process.env.OPENF1_API_KEY || ''

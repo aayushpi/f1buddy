@@ -19,7 +19,7 @@ import type {
 
 // Base URL for the OpenF1 REST API.
 // - In production (e.g. on Vercel) the app calls a same-origin proxy at /api/v1
-//   so the OpenF1 key stays server-side (see api/[...path].mjs). One key then
+//   so the OpenF1 key stays server-side (see api/[...path].js). One key then
 //   serves every viewer and live data "just works" with no client config.
 // - In local dev it hits OpenF1 directly — free historical data needs no key.
 // Override either with VITE_OPENF1_BASE_URL (e.g. a separate proxy host).

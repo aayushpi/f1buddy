@@ -39,8 +39,10 @@ function parseSimLive(): SimLive | null {
 
 const LS_KEY = 'f1buddy.state.v2'
 
+// The API base URL / key are NOT persisted: they come from the build/env
+// default every load, so a value saved by an older build can't mask the current
+// one (which previously made the app "work on one device, break on another").
 interface Persisted {
-  settings: AppSettings
   lapWindow: number
   selected: number[]
   activeView: ActiveView
@@ -51,7 +53,6 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { baseUrl: defaultConfig.baseUrl, apiKey: '', sessionKey: 'latest' },
   lapWindow: 6,
   selected: [],
   activeView: 'timing',
@@ -71,7 +72,12 @@ function loadState(): Persisted {
 
 export default function App() {
   const [initial] = useState(loadState)
-  const [settings, setSettings] = useState<AppSettings>(initial.settings)
+  // Always seeded from the build/env default — never from saved state.
+  const [settings, setSettings] = useState<AppSettings>(() => ({
+    baseUrl: defaultConfig.baseUrl,
+    apiKey: '',
+    sessionKey: 'latest',
+  }))
   const [lapWindow, setLapWindow] = useState(initial.lapWindow)
   const [selected, setSelected] = useState<Set<number>>(new Set(initial.selected))
   // Gap-to-Leader visibility (its own set; defaults to the top 5 per session).
@@ -175,13 +181,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    const data: Persisted = { settings, lapWindow, selected: [...selected], activeView, notify: [...notify], trackAlerts }
+    const data: Persisted = { lapWindow, selected: [...selected], activeView, notify: [...notify], trackAlerts }
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(data))
     } catch {
       /* ignore */
     }
-  }, [settings, lapWindow, selected, activeView, notify, trackAlerts])
+  }, [lapWindow, selected, activeView, notify, trackAlerts])
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
