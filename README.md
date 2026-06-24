@@ -59,7 +59,7 @@ Powered by the free, open [OpenF1 API](https://openf1.org/) (`api.openf1.org/v1`
 - **Only the live, real-time stream requires a paid OpenF1 subscription.** The
   recommended setup keeps the key **server-side**: deploy to Vercel and set
   `OPENF1_API_KEY` in the project env. The bundled serverless proxy
-  (`api/[...path].js`) injects it as a `Bearer` token and the app calls it
+  (`api/proxy.js`) injects it as a `Bearer` token and the app calls it
   same-origin at `/api/v1`, so the key never reaches the browser and one key
   serves every viewer. (Settings → API Key still works as a local override.)
 

@@ -11,7 +11,7 @@ API. Designed for iPad landscape, responsive down to phones.
   and coalesces identical/concurrent requests, so one key serves many viewers (a
   single browser otherwise exceeds the 60 req/min paid cap). Two forms, same
   logic: `server/proxy.mjs` (standalone Node, via `VITE_OPENF1_BASE_URL`) and
-  `api/[...path].js` (Vercel serverless). On Vercel the app calls `/api/v1/...`
+  `api/proxy.js` via a `/api/v1/*` rewrite (Vercel serverless). On Vercel the app calls `/api/v1/...`
   same-origin; set `OPENF1_API_KEY` in the project env and live data works with
   no client config or key in the browser.
 - **Derivation:** all raw feeds are normalised by `utils/derive.ts` into one
