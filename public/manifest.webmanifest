@@ -1,0 +1,14 @@
+{
+  "name": "Cardiogram",
+  "short_name": "Cardiogram",
+  "description": "Live F1 race-companion dashboard — the pulse of the race.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
+}

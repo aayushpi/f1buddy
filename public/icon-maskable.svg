@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Full-bleed background; mark held inside the maskable 80% safe zone. -->
+  <rect width="64" height="64" fill="#05070d"/>
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+    <path d="M3,36 H17 L21,36 L25,29 L29,36 L34,36 L39,47 L44,13 L49,49 L53,36 L57,36 H61"
+      fill="none" stroke="#19e3ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

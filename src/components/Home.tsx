@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { OpenF1Config } from '../api/openf1'
-import { useCalendar, type CalendarSession } from '../hooks/useCalendar'
+import { useCalendar } from '../hooks/useCalendar'
 import { SessionPicker } from './SessionPicker'
+import { CardiogramMark, CG_HERO_PATH } from './Brand'
 
 interface Props {
   config: OpenF1Config
@@ -26,8 +27,7 @@ function formatCountdown(ms: number): string {
 }
 
 function whenLabel(start: number): string {
-  const d = new Date(start)
-  return d.toLocaleString(undefined, {
+  return new Date(start).toLocaleString(undefined, {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -36,13 +36,69 @@ function whenLabel(start: number): string {
   })
 }
 
-function sessionLabel(s: CalendarSession): string {
-  return `${s.meetingName} · ${s.sessionName}`
+type Mode = 'live' | 'next' | 'off' | 'loading' | 'error'
+
+/** The hero ECG trace — colour + a travelling glow dot vary by state. */
+function HeroTrace({ mode }: { mode: Mode }) {
+  if (mode === 'error') {
+    // A broken red trace — signal lost.
+    return (
+      <svg className="hero-trace" viewBox="0 0 800 200" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,120 H322" fill="none" stroke="var(--red)" strokeWidth={2.4} strokeLinecap="round" />
+        <path d="M342,120 H458" fill="none" stroke="var(--red)" strokeWidth={2.4} strokeLinecap="round" strokeDasharray="3 9" opacity={0.6} />
+        <path d="M478,120 H800" fill="none" stroke="var(--red)" strokeWidth={2.4} strokeLinecap="round" />
+      </svg>
+    )
+  }
+  if (mode === 'off') {
+    // A near-flatline — no live pulse.
+    return (
+      <svg className="hero-trace" viewBox="0 0 800 200" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,120 H362 L380,113 L398,127 L414,120 H800" fill="none" stroke="var(--muted)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" opacity={0.13} />
+      </svg>
+    )
+  }
+  const stroke = mode === 'live' ? 'var(--green)' : 'var(--accent)'
+  const dot = mode === 'live' ? '#eafff3' : '#ffffff'
+  return (
+    <svg className="hero-trace" viewBox="0 0 800 200" preserveAspectRatio="none" aria-hidden="true">
+      <path id="cg-hero-path" d={CG_HERO_PATH} fill="none" stroke={stroke} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" opacity={mode === 'live' ? 0.22 : 0.16} />
+      <circle r={5} fill={dot} className="hero-dot">
+        <animateMotion dur={mode === 'live' ? '2.8s' : '3.4s'} repeatCount="indefinite">
+          <mpath href="#cg-hero-path" />
+        </animateMotion>
+      </circle>
+    </svg>
+  )
+}
+
+function StatusPill({ mode }: { mode: Mode }) {
+  const year = new Date().getFullYear()
+  const map: Record<Mode, { cls: string; label: string; pulse?: boolean }> = {
+    live: { cls: 'ok', label: 'Connected', pulse: true },
+    error: { cls: 'err', label: 'Offline' },
+    loading: { cls: '', label: 'Connecting…' },
+    next: { cls: '', label: `${year} Season` },
+    off: { cls: '', label: `${year} · Ended` },
+  }
+  const s = map[mode]
+  return (
+    <div className={`home-status ${s.cls}`}>
+      <span className={`home-status-pip ${s.pulse ? 'pulse' : ''}`} />
+      <span className="home-status-label">{s.label}</span>
+    </div>
+  )
 }
 
 export function Home({ config, onEnterLive, onReplay }: Props) {
   const cal = useCalendar(config)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // Tick once a second so the countdown updates smoothly between calendar polls.
+  const [, setNow] = useState(Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   if (pickerOpen) {
     return (
@@ -57,75 +113,101 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
     )
   }
 
+  const live = cal.state === 'ready' ? cal.live : null
+  const next = cal.state === 'ready' ? cal.next : null
+  const mode: Mode = live
+    ? 'live'
+    : cal.state === 'error'
+      ? 'error'
+      : cal.state === 'loading'
+        ? 'loading'
+        : next
+          ? 'next'
+          : 'off'
+
+  // Off-season promotes "Replay the last race" with an accent border.
+  const replayPromoted = mode === 'off'
+
   return (
-    <div className="home">
-      <div className="fx-grid" />
+    <div className={`home home--${mode}`}>
+      <div className="home-grid" />
 
       <header className="home-top">
         <div className="home-brand">
-          <span className="home-logo">🏎️</span>
-          <span className="home-wordmark">Cardiogram</span>
+          <CardiogramMark size={32} className="home-mark" />
+          <div className="home-brand-text">
+            <span className="home-wordmark">Cardiogram</span>
+            <span className="home-tagline">Live Timing</span>
+          </div>
         </div>
+        <StatusPill mode={mode} />
       </header>
 
       <main className="home-main">
-        {cal.state === 'loading' && (
-          <div className="home-hero panel">
-            <span className="spinner" />
-            <div className="home-hero-sub">Checking the {new Date().getFullYear()} calendar…</div>
-          </div>
-        )}
+        <motion.div
+          className="home-hero"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        >
+          <HeroTrace mode={mode} />
 
-        {cal.state === 'error' && (
-          <div className="home-hero panel">
-            <div className="home-hero-kicker err">Offline</div>
-            <div className="home-hero-title">Couldn’t reach OpenF1</div>
-            <div className="home-hero-sub">Check your connection — you can still load a past session below.</div>
-          </div>
-        )}
-
-        {cal.state === 'ready' && cal.live && (
-          <motion.div
-            className="home-hero panel live"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="home-hero-kicker live">
-              <span className="live-pip" /> Live now
+          {mode === 'live' && live && (
+            <div className="hero-body">
+              <div className="hero-kicker live">
+                <span className="hero-pip" /> Live now
+              </div>
+              <div className="hero-title">{live.meetingName}</div>
+              <div className="hero-sub">{live.sessionName} is running</div>
+              <button className="hero-cta" onClick={() => onEnterLive(live.sessionKey)}>
+                Enter live session →
+              </button>
             </div>
-            <div className="home-hero-title">{cal.live.meetingName}</div>
-            <div className="home-hero-sub">{cal.live.sessionName} is running</div>
-            <button className="home-cta primary" onClick={() => onEnterLive(cal.live!.sessionKey)}>
-              Enter live session →
-            </button>
-          </motion.div>
-        )}
+          )}
 
-        {cal.state === 'ready' && !cal.live && cal.next && (
-          <motion.div
-            className="home-hero panel"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="home-hero-kicker">Next session</div>
-            <div className="home-hero-title">{sessionLabel(cal.next)}</div>
-            <div className="home-countdown mono">{formatCountdown(cal.next.start - Date.now())}</div>
-            <div className="home-hero-sub">{whenLabel(cal.next.start)}</div>
-          </motion.div>
-        )}
+          {mode === 'next' && next && (
+            <div className="hero-body">
+              <div className="hero-kicker">
+                <span className="hero-pip static" /> Next session
+              </div>
+              <div className="hero-title">{next.meetingName}</div>
+              <div className="hero-countdown mono">{formatCountdown(next.start - Date.now())}</div>
+              <div className="hero-sub">{next.sessionName} · {whenLabel(next.start)}</div>
+            </div>
+          )}
 
-        {cal.state === 'ready' && !cal.live && !cal.next && (
-          <div className="home-hero panel">
-            <div className="home-hero-kicker">Off season</div>
-            <div className="home-hero-title">No upcoming sessions</div>
-            <div className="home-hero-sub">Replay a past race below.</div>
-          </div>
-        )}
+          {mode === 'off' && (
+            <div className="hero-body">
+              <div className="hero-kicker muted">Off season</div>
+              <div className="hero-title">No upcoming sessions</div>
+              <div className="hero-sub">The flag has dropped. Replay a past race below.</div>
+            </div>
+          )}
+
+          {mode === 'loading' && (
+            <div className="hero-body">
+              <div className="hero-kicker">Connecting</div>
+              <div className="hero-title">Checking the calendar…</div>
+              <div className="home-spinner-pill">
+                <span className="spinner" />
+                <span className="mono">Checking the {new Date().getFullYear()} calendar…</span>
+              </div>
+            </div>
+          )}
+
+          {mode === 'error' && (
+            <div className="hero-body">
+              <div className="hero-kicker err">Signal lost</div>
+              <div className="hero-title">Couldn’t reach OpenF1</div>
+              <div className="hero-sub">Check your connection — you can still load a past session below.</div>
+            </div>
+          )}
+        </motion.div>
 
         <div className="home-actions">
           {cal.lastRace && (
             <motion.button
-              className="home-action"
+              className={`home-action ${replayPromoted ? 'promoted' : ''}`}
               onClick={() => onReplay(cal.lastRace!.sessionKey, false)}
               whileTap={{ scale: 0.98 }}
             >
@@ -148,7 +230,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
       </main>
 
       <footer className="home-foot">
-        Powered by the OpenF1 API · made by{' '}
+        Made by{' '}
         <a className="home-credit" href="https://aayush.fyi" target="_blank" rel="noopener noreferrer">
           Aayush
         </a>
