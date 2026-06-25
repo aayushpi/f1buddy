@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { OpenF1Config } from '../api/openf1'
 import { useCalendar } from '../hooks/useCalendar'
@@ -74,65 +74,134 @@ function HeroTrace({ mode }: { mode: Mode }) {
 }
 
 // Bounds + flipped viewBox for a circuit outline, mirroring the Track Map view
-// so the shape reads upright. Returns an SVG path (closed) and a viewBox.
-function trackGeometry(points: CircuitPt[]) {
+// so the shape reads upright.
+function trackView(points: CircuitPt[]) {
   const xs = points.map((p) => p[0])
   const ys = points.map((p) => p[1])
   let minX = Math.min(...xs)
   let maxX = Math.max(...xs)
   let minY = Math.min(...ys)
   let maxY = Math.max(...ys)
-  const padX = (maxX - minX) * 0.1 + 60
-  const padY = (maxY - minY) * 0.1 + 60
+  const padX = (maxX - minX) * 0.12 + 70
+  const padY = (maxY - minY) * 0.12 + 70
   minX -= padX
   maxX += padX
   minY -= padY
   maxY += padY
-  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z'
-  // Perimeter (closed) so the comet dash can be sized as a fraction of the lap.
-  let len = 0
-  for (let i = 1; i < points.length; i++) len += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])
-  len += Math.hypot(points[0][0] - points[points.length - 1][0], points[0][1] - points[points.length - 1][1])
   return {
-    d,
-    len,
     viewBox: `${minX} ${-maxY} ${maxX - minX} ${maxY - minY}`, // Y flipped via the group transform below
     scale: Math.max(maxX - minX, maxY - minY),
   }
 }
 
+// Closed Catmull-Rom → cubic-bézier spline through the points: turns the jagged
+// polyline into smooth curves.
+function smoothClosedPath(points: CircuitPt[]): string {
+  const p = points.slice()
+  if (p.length > 2 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) < 1e-3) p.pop()
+  const n = p.length
+  if (n < 3) return p.map((q, i) => `${i ? 'L' : 'M'}${q[0]},${q[1]}`).join(' ')
+  const at = (i: number) => p[((i % n) + n) % n]
+  let d = `M${at(0)[0].toFixed(1)},${at(0)[1].toFixed(1)} `
+  for (let i = 0; i < n; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2)
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)} `
+  }
+  return d + 'Z'
+}
+
 /**
- * The upcoming/live circuit outline with a glowing pulse sweeping around it —
- * the cardiogram beat tracing the actual track. The full outline breathes; a
- * bright comet (a dash animated via stroke-dashoffset) laps the circuit.
+ * The upcoming/live circuit outline with a glowing dot lapping it like a car —
+ * quick down the straights, easing through the corners. The speed profile is
+ * built from the path's curvature and fed to animateMotion as keyPoints/keyTimes.
  */
 function TrackPulse({ points, mode }: { points: CircuitPt[]; mode: Mode }) {
-  const geo = useMemo(() => trackGeometry(points), [points])
+  const { d, view } = useMemo(() => ({ d: smoothClosedPath(points), view: trackView(points) }), [points])
   const isLive = mode === 'live'
   const color = isLive ? 'var(--green)' : 'var(--accent)'
-  const w = geo.scale * 0.007
-  const seg = geo.len * 0.16 // comet length: ~1/6 of the lap
+  const dotFill = isLive ? '#eafff3' : '#ffffff'
+  const dur = isLive ? 7 : 10
+  const pathRef = useRef<SVGPathElement | null>(null)
+  const amRef = useRef<SVGElement | null>(null)
+
+  // Derive a corner-aware speed profile: sample the curve, measure the turn
+  // angle at each step (≈ curvature), and spend more time where it bends.
+  useLayoutEffect(() => {
+    const path = pathRef.current
+    const am = amRef.current
+    if (!path || !am) return
+    let L = 0
+    try {
+      L = path.getTotalLength()
+    } catch {
+      return
+    }
+    if (!L) return
+    const N = 200
+    const ds = L / N
+    const ang: number[] = []
+    for (let j = 0; j < N; j++) {
+      const s = j * ds
+      const a = path.getPointAtLength((s - ds + L) % L)
+      const b = path.getPointAtLength(s)
+      const c = path.getPointAtLength((s + ds) % L)
+      const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)
+      const dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y)
+      ang.push(Math.abs(Math.atan2(cross, dot)))
+    }
+    // Smooth the curvature so speed changes are gradual, not jerky.
+    const win = 4
+    const sm: number[] = []
+    for (let j = 0; j < N; j++) {
+      let acc = 0
+      for (let k = -win; k <= win; k++) acc += ang[((j + k) % N + N) % N]
+      sm.push(acc / (2 * win + 1))
+    }
+    const maxA = Math.max(...sm, 1e-4)
+    const K = 3.2 / maxA // tightest corner ≈ 4× slower than a straight
+    const times: number[] = [0]
+    let T = 0
+    for (let j = 0; j < N; j++) {
+      T += 1 + K * sm[j]
+      times.push(T)
+    }
+    const keyPoints: string[] = []
+    const keyTimes: string[] = []
+    for (let j = 0; j <= N; j++) {
+      keyPoints.push((j / N).toFixed(4))
+      keyTimes.push((times[j] / T).toFixed(4))
+    }
+    am.setAttribute('keyPoints', keyPoints.join(';'))
+    am.setAttribute('keyTimes', keyTimes.join(';'))
+    am.setAttribute('calcMode', 'linear')
+    try {
+      ;(am as unknown as SVGAnimationElement).beginElement()
+    } catch {
+      /* SMIL may not be ready; the animation still runs with these attrs */
+    }
+  }, [d, dur])
+
   return (
-    <svg className="hero-track" viewBox={geo.viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <svg className="hero-track" viewBox={view.viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <g transform="scale(1,-1)" style={{ color }}>
         <path
+          ref={pathRef}
+          id="cg-track-path"
           className="hero-track-outline"
-          d={geo.d}
+          d={d}
           fill="none"
           stroke="currentColor"
-          strokeWidth={w}
+          strokeWidth={view.scale * 0.006}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-        <path
-          className="hero-track-pulse"
-          d={geo.d}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={w * 1.5}
-          strokeDasharray={`${seg.toFixed(1)} ${geo.len.toFixed(1)}`}
-          style={{ ['--len' as string]: geo.len.toFixed(1), animationDuration: isLive ? '4.5s' : '6.5s' }}
-        />
+        <circle r={view.scale * 0.022} fill={dotFill} className="hero-dot">
+          <animateMotion ref={amRef} dur={`${dur}s`} repeatCount="indefinite" rotate="auto" calcMode="linear">
+            <mpath href="#cg-track-path" />
+          </animateMotion>
+        </circle>
       </g>
     </svg>
   )
