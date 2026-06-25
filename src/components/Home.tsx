@@ -235,19 +235,6 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
     return () => clearInterval(id)
   }, [])
 
-  if (pickerOpen) {
-    return (
-      <SessionPicker
-        config={config}
-        onClose={() => setPickerOpen(false)}
-        onPick={(key, simulate) => {
-          setPickerOpen(false)
-          onReplay(key, simulate)
-        }}
-      />
-    )
-  }
-
   const live = cal.state === 'ready' ? cal.live : null
   const next = cal.state === 'ready' ? cal.next : null
   const mode: Mode = live
@@ -271,6 +258,21 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
 
   // Off-season promotes "Replay the last race" with an accent border.
   const replayPromoted = mode === 'off'
+
+  // Conditional return must sit BELOW every hook above (React hooks must run in
+  // the same order each render) — otherwise opening the picker crashes the app.
+  if (pickerOpen) {
+    return (
+      <SessionPicker
+        config={config}
+        onClose={() => setPickerOpen(false)}
+        onPick={(key, simulate) => {
+          setPickerOpen(false)
+          onReplay(key, simulate)
+        }}
+      />
+    )
+  }
 
   return (
     <div className={`home home--${mode}`}>
