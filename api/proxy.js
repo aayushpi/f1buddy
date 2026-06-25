@@ -151,6 +151,10 @@ export default async function handler(req, res) {
     res.setHeader('Content-Type', entry.ct)
     res.setHeader('X-Proxy-Age-Ms', String(Date.now() - entry.at))
     res.setHeader('X-Upstream-Url', url) // ops aid for live-day debugging (no token, public URL)
+    // Auth signal (never the token itself): confirms the OpenF1 token exchange
+    // succeeded so live data will be authorized. 'token' = creds exchanged OK,
+    // 'none' = running unauthenticated (fine for free historical only).
+    res.setHeader('X-Auth', token ? 'token' : 'none')
     res.end(entry.body)
   } catch (e) {
     res.statusCode = 502
