@@ -23,7 +23,9 @@ export type Notice =
   | { id: string; kind: 'radio'; acronym: string; colour: string; url: string }
 
 const EPS = 0.0005
-const MAX_VISIBLE = 4
+// Notices now collapse into per-kind decks, so we can keep a few more around
+// without flooding the corner — a burst stacks instead of sprawling.
+const MAX_VISIBLE = 8
 
 interface Baselines {
   primed: boolean

@@ -1568,6 +1568,57 @@ button {
 }
 @keyframes notice-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
+/* Grouped notice decks: same-kind notices collapse into an iOS-style stack. */
+.notice-group { position: relative; pointer-events: auto; }
+.notice-group.is-expanded { display: flex; flex-direction: column; gap: 10px; }
+.notice-group.is-collapsed { cursor: pointer; margin-bottom: 12px; }
+
+/* Collapsed: top card stays in flow; the rest fan out behind it. */
+.notice-group.is-collapsed > .notice { position: relative; z-index: 3; }
+.notice-group.is-collapsed > .notice.is-ghost {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  pointer-events: none;
+}
+.notice-group.is-collapsed > .notice.ghost-1 {
+  transform: translateY(7px) scale(0.955);
+  z-index: 2;
+  filter: brightness(0.9);
+}
+.notice-group.is-collapsed > .notice.ghost-2 {
+  transform: translateY(14px) scale(0.91);
+  z-index: 1;
+  filter: brightness(0.8);
+}
+.notice-group.is-collapsed > .notice.ghost-hidden { display: none; }
+
+/* "+N" pill hanging off a collapsed deck. */
+.notice-count {
+  position: absolute;
+  right: 10px; bottom: -8px;
+  z-index: 4;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px; font-weight: 800;
+  background: var(--bg-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.notice-collapse {
+  align-self: flex-end;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+.notice-collapse:hover { color: var(--text); }
+
 /* ============================ Pit Simulator ============================ */
 .ps-panel { display: flex; flex-direction: column; min-height: 0; }
 .ps-circuit { color: var(--text); font-weight: 700; letter-spacing: 0.04em; text-transform: none; }

@@ -33,6 +33,7 @@ import type {
   TrackStatus,
   WeatherPoint,
 } from '../api/types'
+import { teamColourFor } from '../data/teamColors'
 
 export interface RawData {
   session: ApiSession | null
@@ -376,7 +377,7 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
       acronym: d.name_acronym,
       fullName: d.full_name,
       teamName: d.team_name,
-      teamColour: d.team_colour,
+      teamColour: teamColourFor(d.team_name, d.team_colour),
       position,
       isLeader: position === 1,
       gapToLeader: interval?.gap_to_leader ?? null,
