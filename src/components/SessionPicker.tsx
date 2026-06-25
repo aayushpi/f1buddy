@@ -139,13 +139,6 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
           ‹ {selected ? 'All Grands Prix' : 'Home'}
         </button>
         <div className="picker-title">{selected ? selected.meeting_name : 'Load a past session'}</div>
-        <button
-          className={`chip pick-sim ${simulate ? 'on' : ''}`}
-          onClick={() => setSimulate((v) => !v)}
-          title="Replay as if live (real-time growing edge) instead of loading the full race"
-        >
-          <span className="swatch" />◉ Simulate live
-        </button>
         <div className="seg picker-years">
           {YEARS.map((y) => (
             <button key={y} className={y === year ? 'active' : ''} onClick={() => setYear(y)}>
@@ -208,10 +201,17 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
                 </motion.button>
               ))}
           </div>
+          <button
+          className={`chip pick-sim ${simulate ? 'on' : ''}`}
+          onClick={() => setSimulate((v) => !v)}
+          title="Replay as if live (real-time growing edge) instead of loading the full race"
+        >
+          <span className="swatch" />Simulate live
+        </button>
           <div className="picker-foot">
             {simulate
-              ? 'Simulate live: the session replays from lights-out as a real-time growing edge.'
-              : 'Full replay: the whole session is available to scrub and fast-forward.'}
+              ? 'Session will be simulated live. For testing only'
+              : 'Replay this session'}
           </div>
         </div>
       )}

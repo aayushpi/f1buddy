@@ -266,7 +266,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
           <CardiogramMark size={32} className="home-mark" />
           <div className="home-brand-text">
             <span className="home-wordmark">Cardiogram</span>
-            <span className="home-tagline">Live Timing</span>
+            <span className="home-tagline">Real-time Formula One telemetry, visualization, and analysis</span>
           </div>
         </div>
       </header>
@@ -300,7 +300,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
           {mode === 'next' && next && (
             <div className="hero-body">
               <div className="hero-kicker">
-                <span className="hero-pip static" /> Next session
+                <span className="static" /> Up Next
               </div>
               <div className="hero-title">{next.meetingName}</div>
               <div className="hero-countdown mono">{formatCountdown(next.start - Date.now())}</div>

@@ -268,7 +268,6 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
       <div className="panel-title">
         <span className="dot" />
         Pit Simulator
-        <span className="ps-circuit">{circuit}</span>
         {pitCount > 0 && (
           <button className="ps-clear" onClick={clearAll}>
             Clear ({pitCount})

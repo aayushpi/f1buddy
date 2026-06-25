@@ -75,7 +75,6 @@ export function RaceControlView({
         <div className="panel-title">
           <span className="dot" />
           Notify me about
-          <span className="rc-notify-hint">race control &amp; radio for selected drivers</span>
           <button
             className={`chip rc-track-toggle ${trackAlerts ? 'on' : ''}`}
             onClick={onToggleTrackAlerts}
