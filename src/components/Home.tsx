@@ -207,23 +207,6 @@ function TrackPulse({ points, mode }: { points: CircuitPt[]; mode: Mode }) {
   )
 }
 
-function StatusPill({ mode }: { mode: Mode }) {
-  const year = new Date().getFullYear()
-  const map: Record<Mode, { cls: string; label: string; pulse?: boolean }> = {
-    live: { cls: 'ok', label: 'Connected', pulse: true },
-    error: { cls: 'err', label: 'Offline' },
-    loading: { cls: '', label: 'Connecting…' },
-    next: { cls: '', label: `${year} Season` },
-    off: { cls: '', label: `${year} · Ended` },
-  }
-  const s = map[mode]
-  return (
-    <div className={`home-status ${s.cls}`}>
-      <span className={`home-status-pip ${s.pulse ? 'pulse' : ''}`} />
-      <span className="home-status-label">{s.label}</span>
-    </div>
-  )
-}
 
 export function Home({ config, onEnterLive, onReplay }: Props) {
   const cal = useCalendar(config)
@@ -286,7 +269,6 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
             <span className="home-tagline">Live Timing</span>
           </div>
         </div>
-        <StatusPill mode={mode} />
       </header>
 
       <main className="home-main">
