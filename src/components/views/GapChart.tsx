@@ -4,6 +4,8 @@ import { teamHex, teamLineDash } from '../../utils/format'
 
 interface Props {
   drivers: DriverState[] // sorted by position
+  selected: Set<number> // which drivers to plot
+  onToggle: (n: number) => void
   raceControl: RaceControlEntry[]
   meetingName: string
   sessionName: string
@@ -45,12 +47,11 @@ function niceStep(max: number): number {
   return 30
 }
 
-export function GapChart({ drivers, raceControl, meetingName, sessionName, year }: Props) {
+export function GapChart({ drivers, selected, onToggle, raceControl, meetingName, sessionName, year }: Props) {
   const model = useMemo(() => {
-    const top = drivers.slice(0, 5)
-
-    // Cumulative race time per lap for each car.
-    const series = top.map((d) => {
+    // Cumulative race time per lap for EVERY car, so the leader baseline is the
+    // true race leader even when that car is toggled off.
+    const series = drivers.map((d) => {
       let cum = 0
       const byLap = new Map<number, number>()
       for (const l of d.lapHistory) {
@@ -79,35 +80,68 @@ export function GapChart({ drivers, raceControl, meetingName, sessionName, year 
       if (best < Infinity) leaderCum.set(lap, best)
     }
 
+    // Plot only the selected drivers, but gap is always to the real leader.
     let maxGap = 1
-    const lines = series.map((s) => {
-      const pts: { lap: number; gap: number }[] = []
-      for (let lap = 1; lap <= maxLap; lap++) {
-        const c = s.byLap.get(lap)
-        const lead = leaderCum.get(lap)
-        if (c != null && lead != null) {
-          const gap = c - lead
-          if (gap > maxGap) maxGap = gap
-          pts.push({ lap, gap })
+    const lines = series
+      .filter((s) => selected.has(s.driver.driverNumber))
+      .map((s) => {
+        const pts: { lap: number; gap: number }[] = []
+        for (let lap = 1; lap <= maxLap; lap++) {
+          const c = s.byLap.get(lap)
+          const lead = leaderCum.get(lap)
+          if (c != null && lead != null) {
+            const gap = c - lead
+            if (gap > maxGap) maxGap = gap
+            pts.push({ lap, gap })
+          }
         }
-      }
-      return { driver: s.driver, pts }
-    })
+        return { driver: s.driver, pts }
+      })
 
     return { lines, maxLap, maxGap, bands: scBands(raceControl, maxLap) }
-  }, [drivers, raceControl])
+  }, [drivers, selected, raceControl])
 
-  if (!model) {
+  const chips = (
+    <div className="driver-chips">
+      {drivers.map((d) => (
+        <button
+          key={d.driverNumber}
+          className={`chip ${selected.has(d.driverNumber) ? 'on' : ''}`}
+          style={{ ['--team' as string]: teamHex(d.teamColour) }}
+          onClick={() => onToggle(d.driverNumber)}
+        >
+          <span className="swatch" />
+          {d.acronym}
+        </button>
+      ))}
+    </div>
+  )
+
+  const header = (
+    <div className="gap-header">
+      <div>
+        <div className="gap-title">Gap to Leader</div>
+        <div className="gap-sub">Gap to the race leader, lap by lap — toggle drivers below</div>
+      </div>
+      <div className="gap-badge">
+        <span className="gap-badge-name">{meetingName || '—'}</span>
+        {year != null && <span className="gap-badge-dim">{year}</span>}
+        <span className="gap-badge-ses">{(sessionName || '').toUpperCase()}</span>
+      </div>
+    </div>
+  )
+
+  if (!model || !model.lines.some((l) => l.pts.length >= 2)) {
     return (
       <div className="panel gapview">
-        <div className="gap-header">
-          <div>
-            <div className="gap-title">Gap to Leader</div>
-            <div className="gap-sub">How the top 5 spread out — or converged</div>
-          </div>
-        </div>
+        {header}
+        {chips}
         <div className="gap-canvas">
-          <div className="map-empty">Waiting for lap data — at least two completed laps are needed.</div>
+          <div className="map-empty">
+            {!model
+              ? 'Waiting for lap data — at least two completed laps are needed.'
+              : 'Select at least one driver to plot.'}
+          </div>
         </div>
       </div>
     )
@@ -146,17 +180,8 @@ export function GapChart({ drivers, raceControl, meetingName, sessionName, year 
 
   return (
     <div className="panel gapview">
-      <div className="gap-header">
-        <div>
-          <div className="gap-title">Gap to Leader</div>
-          <div className="gap-sub">How the top 5 spread out — or converged</div>
-        </div>
-        <div className="gap-badge">
-          <span className="gap-badge-name">{meetingName || '—'}</span>
-          {year != null && <span className="gap-badge-dim">{year}</span>}
-          <span className="gap-badge-ses">{(sessionName || '').toUpperCase()}</span>
-        </div>
-      </div>
+      {header}
+      {chips}
 
       <div className="gap-canvas">
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="gap-svg">

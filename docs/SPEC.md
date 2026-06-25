@@ -7,11 +7,11 @@ API. Designed for iPad landscape, responsive down to phones.
 
 - **Source:** OpenF1 REST. Historical data (2023+) is free; live data (the window
   from 30 min before a session to 30 min after it ends) needs a paid key.
-- **Caching proxy** (`server/proxy.mjs`): optional Node service that holds the API
-  key server-side, caches responses (~2 s TTL) and coalesces identical/concurrent
-  requests. Point the app at it via `VITE_OPENF1_BASE_URL`. Lets one key serve
-  many simultaneous viewers (a single browser otherwise exceeds the 60 req/min
-  paid cap).
+- **API key:** the app calls OpenF1 directly; add a key in Settings → API Key
+  (sent as a `Bearer` token) for live real-time. An optional caching proxy
+  (`server/proxy.mjs`) can hold the key server-side and coalesce requests so one
+  key serves many viewers; point the app at it via `VITE_OPENF1_BASE_URL`.
+  (A hosted same-origin proxy is planned in a separate branch.)
 - **Derivation:** all raw feeds are normalised by `utils/derive.ts` into one
   `RaceSnapshot` that every view renders. `buildLapMarkers` / `rawTimeBounds`
   define the timeline; `filterRawByTime` reveals the snapshot at a playback time.
@@ -34,10 +34,28 @@ There is a single engine for both live and historical sessions.
   timeline end forward. Telemetry (`car_data` / `location`) is fetched in a
   window around the clock to stay light.
 
-## 3. Watching modes
+## 3. Entry — home screen (`components/Home.tsx`)
 
-- **Default = `latest`:** loads the most recent session — live if one is in
-  progress, otherwise the last completed race.
+The first page is a landing screen driven by the season calendar
+(`hooks/useCalendar.ts`, from OpenF1 `sessions`/`meetings`, re-evaluated each
+second):
+
+- **A session is live now** → a **● LIVE** card with an *Enter live session*
+  button (every on-track session counts: practice, qualifying, sprint, race).
+- **Nothing live** → a live **countdown** to the next session, a **Replay the
+  last race** shortcut, and a **Load a past session** button opening a
+  full-screen picker (`components/SessionPicker.tsx`: year → Grand Prix →
+  session).
+
+Routing: a **live** pick loads real-time live mode; a **historical** pick loads
+the **full race** (whole timeline available to scrub) by default. A **Simulate
+live** toggle in the picker instead replays a past session as if live (a
+real-time growing edge from lights-out) for testing the live flow. Each Grand
+Prix card shows a mini circuit-outline SVG (country-flag fallback). The ⌂ button
+on the nav returns to the home screen.
+
+## 3a. Watching modes
+
 - **Start from the beginning (default for live):** joining an in-progress race
   begins at lights-out, spoiler-free. A one-time prompt offers **Watch from the
   start** vs **Jump to live**; the two are deliberately separated and styled
@@ -52,8 +70,9 @@ There is a single engine for both live and historical sessions.
 
 ## 4. Scrubber (`components/ReplayBar.tsx`)
 
-- Play/pause, 1–12× speed, lap-step ‹ ›, and a scrubber with **per-lap tick
-  markers** you can tap to jump.
+- Play/pause, lap-step ‹ ›, and a scrubber with **per-lap tick markers** you can
+  tap to jump. Finished replays add a 1–12× speed selector; live and sim-live
+  run at 1× (the selector is hidden — just pause + jump-to-live).
 - **Pre-race** (standing/grid) is shaded as a hatched band; the **formation lap
   (“lap 0”)** is a distinct amber band, with a lights-out boundary line at lap 1.
 - Lap markers reflect only data revealed so far; future laps are hidden.
@@ -63,26 +82,44 @@ There is a single engine for both live and historical sessions.
 Auto-dismissing popovers, stacked newest-at-bottom so a burst reads in order:
 
 - **Fastest lap** and **fastest sector (overall)** — fire at the real crossing.
-- **Race control** bulletins — message normalised from ALL CAPS to sentence
-  case, preserving acronyms (DRS/VSC), driver codes `(VER)` and positions `P4`.
-- **Team radio** — playable clips.
+  Always on.
+- **Race control** bulletins and **team radio** — **opt-in per driver** to keep
+  the stack quiet: they pop up only for drivers toggled on in the Race Control
+  tab's "Notify me about" chips (default: none). Messages are still normalised
+  from ALL CAPS to sentence case, preserving acronyms (DRS/VSC), driver codes
+  `(VER)` and positions `P4`.
 
-The full history always remains in the Race Control tab.
+- **Track-wide flags / safety car** — critical track-wide bulletins pop up via a
+  separate **"Track-wide flags"** toggle (on by default) in the same panel.
+
+The full history always remains in the Race Control tab; the nav status dot
+still reflects track-wide flags. Both preferences persist across sessions.
 
 ## 6. Chrome
 
-- **Nav row** (`components/ViewTabs.tsx`): the eight view tabs, plus a
-  right-aligned **track-status light** (glowing dot: clear / yellow / SC·VSC /
-  red / chequered, with a label for the states that matter; falls back to
-  connection state before a session is live) and the **settings** gear.
+- **Nav row** (`components/ViewTabs.tsx`): a left-aligned **⌂ home** button, the
+  horizontally-scrolling view tabs, and the **settings** gear. The tab track
+  scrolls rather than wrapping when space is tight.
+- **Track-status badge** (`components/TrackStatus.tsx`): a glowing flag light
+  (Track Clear / yellow / SC·VSC / red / chequered, falling back to connection
+  state) pinned **bottom-left**.
 - **No persistent header**: the lap is shown in the scrubber; flag status is the
   nav dot. A weather strip is the only footer.
 
 ## 7. Views
 
-`Timing` (tower + lap-time analysis), `Track Map`, `Speed Map`, `Gap to Leader`,
-`Telemetry`, `Strategy`, `Race Control`, `Weather`.
+`Timing` (tower + lap-time analysis), `Track Map`, `Gap to Leader`,
+`Telemetry`, `Strategy`, `Pit Simulator` (what-if pit-stop order vs. live),
+`Race Control` (with overtakes, team radio, per-driver alert opt-in, and the
+weather panel folded in).
 
+- **Strategy:** the stint Gantt colours each set by `tyre_age_at_start` — sets
+  that started (near-)fresh (<2 laps) glow in vivid compound colours, used sets
+  stay muted — and each bar shows the tyre's total life in laps.
+
+- **Gap to Leader:** plots each car's gap to the *true* race leader, lap by lap.
+  Every driver is a chip toggle (top 5 on by default, per session); toggling
+  changes which traces are drawn without moving the leader baseline.
 - **Track Map:** draws the real circuit outline from a generated library
   (`data/circuits.ts`, from the MIT f1-circuits dataset), **registered onto the
   live coordinate frame** (`utils/trackAlign.ts`) so the car dots sit on it;

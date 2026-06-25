@@ -1,11 +1,28 @@
 import { useRef, useState } from 'react'
-import type { OvertakeEvent, RaceControlEntry, RadioClip } from '../../api/types'
+import type {
+  ApiWeather,
+  DriverState,
+  OvertakeEvent,
+  RaceControlEntry,
+  RadioClip,
+  WeatherPoint,
+} from '../../api/types'
 import { formatRaceMessage, teamHex, timeOfDay } from '../../utils/format'
+import { WeatherView } from './WeatherView'
 
 interface Props {
   log: RaceControlEntry[]
   overtakes: OvertakeEvent[]
   radios: RadioClip[]
+  drivers: DriverState[]
+  // Drivers the user wants race-control + radio popups for.
+  notify: Set<number>
+  onToggleNotify: (n: number) => void
+  // Critical track-wide bulletins (flags / safety car) popups, on by default.
+  trackAlerts: boolean
+  onToggleTrackAlerts: () => void
+  weather: ApiWeather | null
+  weatherHistory: WeatherPoint[]
 }
 
 function flagClass(entry: RaceControlEntry): string {
@@ -43,9 +60,48 @@ function RadioPlayer({ clip }: { clip: RadioClip }) {
   )
 }
 
-export function RaceControlView({ log, overtakes, radios }: Props) {
+export function RaceControlView({
+  log,
+  overtakes,
+  radios,
+  drivers,
+  notify,
+  onToggleNotify,
+  trackAlerts,
+  onToggleTrackAlerts,
+  weather,
+  weatherHistory,
+}: Props) {
   return (
     <div className="control-view">
+      <div className="panel rc-notify">
+        <div className="panel-title">
+          <span className="dot" />
+          Notify me about
+          <span className="rc-notify-hint">race control &amp; radio for selected drivers</span>
+          <button
+            className={`chip rc-track-toggle ${trackAlerts ? 'on' : ''}`}
+            onClick={onToggleTrackAlerts}
+            title="Critical track-wide flags & safety car"
+          >
+            <span className="swatch" />⚑ Track-wide flags
+          </button>
+        </div>
+        <div className="driver-chips">
+          {drivers.map((d) => (
+            <button
+              key={d.driverNumber}
+              className={`chip ${notify.has(d.driverNumber) ? 'on' : ''}`}
+              style={{ ['--team' as string]: teamHex(d.teamColour) }}
+              onClick={() => onToggleNotify(d.driverNumber)}
+            >
+              <span className="swatch" />
+              {d.acronym}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="panel rc-log">
         <div className="panel-title">
           <span className="dot" />
@@ -120,6 +176,8 @@ export function RaceControlView({ log, overtakes, radios }: Props) {
           </div>
         </div>
       </div>
+
+      <WeatherView current={weather} history={weatherHistory} />
     </div>
   )
 }

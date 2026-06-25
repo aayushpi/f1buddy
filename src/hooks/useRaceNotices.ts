@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RaceSnapshot } from '../api/types'
+import type { RaceControlEntry, RaceSnapshot } from '../api/types'
 import { teamHex } from '../utils/format'
+
+/** Track-wide bulletins worth a popup: flags and safety-car deployments. */
+function isCriticalControl(e: RaceControlEntry): boolean {
+  if (e.category === 'SafetyCar') return true
+  const f = (e.flag ?? '').toUpperCase()
+  if (['RED', 'YELLOW', 'DOUBLE YELLOW', 'CHEQUERED', 'GREEN', 'CLEAR'].includes(f)) return true
+  const m = (e.message ?? '').toUpperCase()
+  return m.includes('SAFETY CAR') || m.includes('RED FLAG')
+}
 
 // Transient, auto-dismissing alerts surfaced as a stacked popover — the same
 // idea as a race-control message flashing up and then clearing. The full record
@@ -56,11 +65,27 @@ function overallSectors(drivers: RaceSnapshot['drivers']) {
  * clears baselines so a new race doesn't replay stale alerts. The first snapshot
  * of a session only primes the baselines — it never fires a flood of notices.
  */
-export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) {
+export function useRaceNotices(
+  snapshot: RaceSnapshot | null,
+  resetKey: string,
+  // Drivers the user has opted into for race-control + radio popups. Empty ⇒ no
+  // per-driver RC/radio notifications (they stay only in the Race Control tab).
+  // Fastest-lap / fastest-sector alerts are unaffected.
+  notifyDrivers: Set<number>,
+  // Whether critical track-wide bulletins (flags / safety car) pop up. On by default.
+  trackAlerts: boolean,
+) {
   const [notices, setNotices] = useState<Notice[]>([])
   const base = useRef<Baselines>(freshBaselines())
   const seq = useRef(0)
   const nextId = () => `n${seq.current++}`
+
+  // Read the live settings inside the snapshot-keyed effect without making them
+  // dependencies (which would otherwise re-scan and could replay alerts).
+  const notifyRef = useRef(notifyDrivers)
+  notifyRef.current = notifyDrivers
+  const trackRef = useRef(trackAlerts)
+  trackRef.current = trackAlerts
 
   // New session: forget everything.
   useEffect(() => {
@@ -91,6 +116,11 @@ export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) 
       .filter((e) => e.date > b.controlDate)
       .sort((a, x) => (a.date < x.date ? -1 : 1))
     for (const e of newControl) {
+      // Driver-specific bulletins: only for drivers the user follows.
+      // Track-wide bulletins: only the critical ones, and only when enabled.
+      const followed = e.driverNumber != null && notifyRef.current.has(e.driverNumber)
+      const trackWide = e.driverNumber == null && trackRef.current && isCriticalControl(e)
+      if (!followed && !trackWide) continue
       fresh.push({
         id: nextId(),
         kind: 'control',
@@ -132,6 +162,8 @@ export function useRaceNotices(snapshot: RaceSnapshot | null, resetKey: string) 
       .filter((r) => r.date > b.radioDate)
       .sort((a, x) => (a.date < x.date ? -1 : 1))
     for (const r of newRadios) {
+      // Only surface radios from a driver the user follows.
+      if (!notifyRef.current.has(r.driverNumber)) continue
       fresh.push({ id: nextId(), kind: 'radio', acronym: r.acronym, colour: teamHex(r.colour), url: r.url })
     }
     if (snapshot.radios[0]) b.radioDate = snapshot.radios[0].date
