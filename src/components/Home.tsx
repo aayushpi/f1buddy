@@ -89,40 +89,50 @@ function trackGeometry(points: CircuitPt[]) {
   minY -= padY
   maxY += padY
   const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z'
+  // Perimeter (closed) so the comet dash can be sized as a fraction of the lap.
+  let len = 0
+  for (let i = 1; i < points.length; i++) len += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1])
+  len += Math.hypot(points[0][0] - points[points.length - 1][0], points[0][1] - points[points.length - 1][1])
   return {
     d,
+    len,
     viewBox: `${minX} ${-maxY} ${maxX - minX} ${maxY - minY}`, // Y flipped via the group transform below
     scale: Math.max(maxX - minX, maxY - minY),
   }
 }
 
 /**
- * The upcoming/live circuit outline with a glowing pulse lapping it — the
- * cardiogram beat tracing the actual track. Outline breathes; the dot laps.
+ * The upcoming/live circuit outline with a glowing pulse sweeping around it —
+ * the cardiogram beat tracing the actual track. The full outline breathes; a
+ * bright comet (a dash animated via stroke-dashoffset) laps the circuit.
  */
 function TrackPulse({ points, mode }: { points: CircuitPt[]; mode: Mode }) {
   const geo = useMemo(() => trackGeometry(points), [points])
   const isLive = mode === 'live'
-  const stroke = isLive ? 'var(--green)' : 'var(--accent)'
-  const dot = isLive ? '#eafff3' : '#ffffff'
+  const color = isLive ? 'var(--green)' : 'var(--accent)'
+  const w = geo.scale * 0.007
+  const seg = geo.len * 0.16 // comet length: ~1/6 of the lap
   return (
     <svg className="hero-track" viewBox={geo.viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <g transform="scale(1,-1)">
+      <g transform="scale(1,-1)" style={{ color }}>
         <path
-          id="cg-track-path"
           className="hero-track-outline"
           d={geo.d}
           fill="none"
-          stroke={stroke}
-          strokeWidth={geo.scale * 0.006}
+          stroke="currentColor"
+          strokeWidth={w}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-        <circle r={geo.scale * 0.02} fill={dot} className="hero-dot">
-          <animateMotion dur={isLive ? '6s' : '9s'} repeatCount="indefinite" rotate="auto">
-            <mpath href="#cg-track-path" />
-          </animateMotion>
-        </circle>
+        <path
+          className="hero-track-pulse"
+          d={geo.d}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={w * 1.5}
+          strokeDasharray={`${seg.toFixed(1)} ${geo.len.toFixed(1)}`}
+          style={{ ['--len' as string]: geo.len.toFixed(1), animationDuration: isLive ? '4.5s' : '6.5s' }}
+        />
       </g>
     </svg>
   )

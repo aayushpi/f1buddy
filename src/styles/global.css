@@ -1913,13 +1913,22 @@ button {
 .hero-dot { filter: drop-shadow(0 0 8px rgba(25, 227, 255, 0.95)); }
 .home--live .hero-dot { filter: drop-shadow(0 0 8px rgba(34, 224, 122, 0.95)); }
 
-/* Upcoming/live circuit outline behind the hero text, breathing like a pulse. */
-.hero-track { position: absolute; inset: 0; width: 100%; height: 100%; padding: 6%; }
-.hero-track-outline { opacity: 0.18; animation: cg-breathe 3.2s ease-in-out infinite; }
+/* Upcoming/live circuit outline behind the hero text, with a pulse lapping it. */
+.hero-track { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5%; }
+.hero-track-outline { opacity: 0.32; animation: cg-breathe 3.2s ease-in-out infinite; }
 .home--live .hero-track-outline { animation-duration: 1.9s; }
-@keyframes cg-breathe { 0%, 100% { opacity: 0.22; } 50% { opacity: 0.09; } }
+@keyframes cg-breathe { 0%, 100% { opacity: 0.42; } 50% { opacity: 0.22; } }
+/* The comet: a bright dash sweeping around the lap via stroke-dashoffset. */
+.hero-track-pulse {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px currentColor);
+  animation: cg-sweep 6.5s linear infinite;
+}
+@keyframes cg-sweep { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .hero-track-outline { animation: none; opacity: 0.18; }
+  .hero-track-outline { animation: none; opacity: 0.34; }
+  .hero-track-pulse { animation: none; }
 }
 
 .hero-body { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; }
