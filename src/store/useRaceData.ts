@@ -18,7 +18,6 @@ export type ActiveView =
   | 'gap'
   | 'telemetry'
   | 'strategy'
-  | 'pit'
   | 'control'
 
 // Dev-only "simulated live": replay a finished session as if it were happening

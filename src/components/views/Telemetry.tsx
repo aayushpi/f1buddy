@@ -2,12 +2,15 @@ import { useMemo } from 'react'
 import type { DriverState, TelemetryTrace } from '../../api/types'
 import { teamHex, teamLineDash } from '../../utils/format'
 import { MiniLine } from '../MiniLine'
+import { LapAnalysis } from '../LapAnalysis'
 
 interface Props {
   drivers: DriverState[]
   telemetry: TelemetryTrace[]
   selected: Set<number>
   onToggle: (n: number) => void
+  lapWindow: number
+  onWindow: (n: number) => void
 }
 
 interface Channel {
@@ -102,7 +105,7 @@ function Card({ d, trace, dash }: { d: DriverState; trace?: TelemetryTrace; dash
   )
 }
 
-export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
+export function Telemetry({ drivers, telemetry, selected, onToggle, lapWindow, onWindow }: Props) {
   const traceMap = useMemo(() => {
     const m = new Map<number, TelemetryTrace>()
     for (const t of telemetry) m.set(t.driverNumber, t)
@@ -116,6 +119,7 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
     .filter((t) => t.speed.length > 1)
 
   return (
+    <div className="telemetry-section">
     <div className="panel telemetry">
       <div className="panel-title">
         <span className="dot" />
@@ -153,6 +157,16 @@ export function Telemetry({ drivers, telemetry, selected, onToggle }: Props) {
       ) : (
         <div className="chart-empty">Select up to four drivers.</div>
       )}
+    </div>
+
+      <LapAnalysis
+        drivers={drivers}
+        selected={selected}
+        onToggle={onToggle}
+        lapWindow={lapWindow}
+        onWindow={onWindow}
+        embedded
+      />
     </div>
   )
 }

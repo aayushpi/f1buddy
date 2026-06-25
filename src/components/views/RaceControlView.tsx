@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import type {
   ApiWeather,
   DriverState,
-  OvertakeEvent,
   RaceControlEntry,
   RadioClip,
   WeatherPoint,
@@ -12,7 +11,6 @@ import { WeatherView } from './WeatherView'
 
 interface Props {
   log: RaceControlEntry[]
-  overtakes: OvertakeEvent[]
   radios: RadioClip[]
   drivers: DriverState[]
   // Drivers the user wants race-control + radio popups for.
@@ -62,7 +60,6 @@ function RadioPlayer({ clip }: { clip: RadioClip }) {
 
 export function RaceControlView({
   log,
-  overtakes,
   radios,
   drivers,
   notify,
@@ -125,32 +122,6 @@ export function RaceControlView({
       </div>
 
       <div className="control-side">
-        <div className="panel rc-overtakes">
-          <div className="panel-title">
-            <span className="dot" />
-            Overtakes
-            <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontWeight: 600 }}>
-              {overtakes.length}
-            </span>
-          </div>
-          <div className="strat-scroll">
-            {overtakes.length ? (
-              overtakes.map((o, i) => (
-                <div key={i} className="ot-row">
-                  <span className="acr" style={{ color: teamHex(o.byColour) }}>
-                    {o.byAcronym}
-                  </span>
-                  <span className="ot-arrow">▸ P{o.position} ▸</span>
-                  <span className="acr dim">{o.onAcronym}</span>
-                  <span className="mono ot-time">{timeOfDay(o.date)}</span>
-                </div>
-              ))
-            ) : (
-              <div className="chart-empty">No overtakes recorded.</div>
-            )}
-          </div>
-        </div>
-
         <div className="panel rc-radio">
           <div className="panel-title">
             <span className="dot" />

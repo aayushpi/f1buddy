@@ -278,18 +278,18 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
 
       <div className="ps-toolbar">
         <div className="ps-toolbar-group">
-          <span className="ps-toolbar-label">Pit time · tap to edit</span>
-          {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
-            <button key={t} className={`ps-loss-chip ${t}`} onClick={() => setEditing(t)} title="Tap to change">
-              {PIT_LABEL[t]} {loss[t].toFixed(0)}s
-            </button>
-          ))}
-        </div>
-        <div className="ps-toolbar-group">
           <span className="ps-toolbar-label">Pit all</span>
           {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
             <button key={t} className={`ps-btn ${t}`} onClick={() => pitAll(t)} title={`Pit every car (${PIT_LABEL[t]})`}>
               {PIT_LABEL[t]} ALL
+            </button>
+          ))}
+        </div>
+        <div className="ps-toolbar-group ps-toolbar-edit">
+          <span className="ps-toolbar-label">Pit time · tap to edit</span>
+          {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
+            <button key={t} className={`ps-loss-chip ${t}`} onClick={() => setEditing(t)} title="Tap to change">
+              {PIT_LABEL[t]} {loss[t].toFixed(0)}s
             </button>
           ))}
         </div>

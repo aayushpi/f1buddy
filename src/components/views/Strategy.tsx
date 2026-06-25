@@ -1,10 +1,8 @@
-import type { GridRow, PitEvent, ResultRow, StintRow } from '../../api/types'
+import type { PitEvent, ResultRow, StintRow } from '../../api/types'
 import {
   compoundColor,
   compoundLabel,
   formatGap,
-  formatLapTime,
-  formatPlaces,
   teamHex,
   timeOfDay,
 } from '../../utils/format'
@@ -12,7 +10,6 @@ import {
 interface Props {
   stints: StintRow[]
   pitLog: PitEvent[]
-  grid: GridRow[]
   results: ResultRow[]
   currentLap: number | null
   finished: boolean
@@ -67,7 +64,7 @@ function StintGantt({ stints, maxLap }: { stints: StintRow[]; maxLap: number }) 
   )
 }
 
-export function Strategy({ stints, pitLog, grid, results, currentLap, finished }: Props) {
+export function Strategy({ stints, pitLog, results, currentLap, finished }: Props) {
   const maxLap = Math.max(1, currentLap ?? 1)
 
   return (
@@ -106,40 +103,25 @@ export function Strategy({ stints, pitLog, grid, results, currentLap, finished }
         <div className="panel strat-grid">
           <div className="panel-title">
             <span className="dot" />
-            {finished && results.length ? 'Result' : 'Grid → Position'}
+            Result
           </div>
           <div className="strat-scroll">
-            {finished && results.length
-              ? results.map((r) => (
-                  <div key={r.driverNumber} className="grid-row">
-                    <span className="mono gpos">{r.position ?? '–'}</span>
-                    <span className="acr" style={{ color: teamHex(r.colour) }}>
-                      {r.acronym}
-                    </span>
-                    <span className="mono gap">
-                      {r.status === 'FIN' ? formatGap(r.gapToLeader) : r.status}
-                    </span>
-                    <span className="mono laps">{r.laps != null ? `${r.laps}L` : ''}</span>
-                  </div>
-                ))
-              : grid.map((g) => (
-                  <div key={g.driverNumber} className="grid-row">
-                    <span className="mono gpos">{g.gridPosition}</span>
-                    <span className="acr" style={{ color: teamHex(g.colour) }}>
-                      {g.acronym}
-                    </span>
-                    <span className="mono gap">
-                      {g.qualifyingTime != null ? formatLapTime(g.qualifyingTime) : ''}
-                    </span>
-                    <span
-                      className={`mono delta ${
-                        g.delta != null && g.delta > 0 ? 'up' : g.delta != null && g.delta < 0 ? 'down' : ''
-                      }`}
-                    >
-                      {formatPlaces(g.delta)}
-                    </span>
-                  </div>
-                ))}
+            {finished && results.length ? (
+              results.map((r) => (
+                <div key={r.driverNumber} className="grid-row">
+                  <span className="mono gpos">{r.position ?? '–'}</span>
+                  <span className="acr" style={{ color: teamHex(r.colour) }}>
+                    {r.acronym}
+                  </span>
+                  <span className="mono gap">
+                    {r.status === 'FIN' ? formatGap(r.gapToLeader) : r.status}
+                  </span>
+                  <span className="mono laps">{r.laps != null ? `${r.laps}L` : ''}</span>
+                </div>
+              ))
+            ) : (
+              <div className="chart-empty">Final classification appears once the session ends.</div>
+            )}
           </div>
         </div>
       </div>

@@ -303,10 +303,22 @@ button {
 .tower-head,
 .tower-row {
   display: grid;
-  grid-template-columns: 34px 1.6fr 58px 52px 132px 1fr 0.85fr 0.85fr 96px;
+  grid-template-columns: 34px 1.6fr 58px 132px 1fr 0.85fr 0.85fr 96px;
   align-items: center;
   gap: 6px;
   padding: 0 14px;
+}
+
+/* Sector column header: three labels aligned over the actual S1/S2/S3 cells. */
+.tower-head .sector-head {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+.tower-head .sector-head span {
+  flex: 1;
+  max-width: 38px;
+  text-align: center;
 }
 
 .tower-head {
@@ -383,26 +395,21 @@ button {
 .stint-cell { text-align: center; font-family: var(--mono); font-size: 13px; }
 .stint-cell .unit { font-size: 9px; color: var(--muted); margin-left: 1px; }
 
-/* Sectors */
+/* Sectors — clean: a coloured bar + time, no box border/background. */
 .sectors { display: flex; gap: 5px; justify-content: center; }
 .sector {
   flex: 1;
   max-width: 38px;
   height: 30px;
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
 }
 .sector .bar { width: 70%; height: 3px; border-radius: 2px; background: var(--muted); margin-bottom: 3px; }
 .sector .t { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
-.sector.fastest { background: rgba(192, 75, 255, 0.14); border-color: rgba(192, 75, 255, 0.5); }
 .sector.fastest .bar { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
 .sector.fastest .t { color: #e9c6ff; }
-.sector.personal { background: rgba(34, 224, 122, 0.12); border-color: rgba(34, 224, 122, 0.45); }
 .sector.personal .bar { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .sector.personal .t { color: #b6f5d2; }
 .sector.normal .bar { background: var(--yellow); }
@@ -708,6 +715,18 @@ button {
   gap: 12px;
 }
 .viewbody > * { flex: 1 1 auto; min-height: 0; }
+
+/* Telemetry section now stacks car telemetry + lap-time analysis, sharing one
+   driver selector. */
+.telemetry-section { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+.telemetry-section > .telemetry,
+.telemetry-section > .analysis { flex: 0 0 auto; }
+
+/* Strategy section: sub-tabs (Strategy / Pit Simulator) over the active panel. */
+.strat-section { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.strat-subtabs { align-self: flex-start; flex: 0 0 auto; }
+.strat-section > .strategy,
+.strat-section > .ps-panel { flex: 1 1 auto; min-height: 0; }
 
 /* ============================ Track map ============================ */
 .mapview { display: flex; flex-direction: column; }
@@ -1239,6 +1258,9 @@ button {
 
 /* ============================ Driver focus panel ============================ */
 .body.with-focus { grid-template-columns: 1.45fr 0.82fr 1.25fr; }
+/* Timing is now a single full-width tower (lap analysis moved to Telemetry). */
+.body.single { grid-template-columns: 1fr; }
+.body.single.with-focus { grid-template-columns: 1.55fr 1.1fr; }
 
 .focus-panel {
   display: flex;
@@ -1396,18 +1418,9 @@ button {
 }
 .gap-title { font-size: 20px; font-weight: 800; letter-spacing: 0.01em; }
 .gap-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
-.gap-badge {
-  display: flex; align-items: center; gap: 9px;
-  background: var(--panel-strong);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 13px;
-  font-size: 12px;
-  flex: 0 0 auto;
-}
-.gap-badge-name { font-weight: 700; }
-.gap-badge-dim { color: var(--muted); }
-.gap-badge-ses { color: var(--red); font-weight: 800; letter-spacing: 0.08em; }
+/* Driver toggles sit above the chart and must stay fully visible — reserve
+   their height so the (flex-growing) chart can't squeeze/clip the list. */
+.gapview .driver-chips { flex: 0 0 auto; max-height: 124px; }
 .gap-canvas { flex: 1 1 auto; min-height: 0; position: relative; padding: 2px 14px 6px; }
 .gap-svg { width: 100%; height: 100%; display: block; }
 .gap-grid { stroke: rgba(120, 160, 255, 0.08); stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -1626,6 +1639,8 @@ button {
 /* Controls toolbar under the title: editable pit-time chips + "pit all". */
 .ps-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 0 16px 10px; }
 .ps-toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+/* Pit-time edit chips float to the right; the Pit-all buttons stay left. */
+.ps-toolbar-edit { margin-left: auto; }
 .ps-toolbar-label { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 
 .ps-loss-chip {
@@ -1907,6 +1922,8 @@ button {
 .home-action-title { font-size: 15px; font-weight: 700; }
 .home-action-sub { font-size: 12px; color: var(--muted); }
 .home-foot { flex: 0 0 auto; text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; z-index: 1; }
+.home-credit { color: var(--text-dim); font-weight: 700; text-decoration: none; }
+.home-credit:hover { color: var(--accent); text-decoration: underline; }
 
 .viewtabs-home { margin-right: 4px; }
 
@@ -2057,13 +2074,11 @@ button {
     padding: 0 10px;
   }
   .tower-head > :nth-child(4),
-  .tower-head > :nth-child(5),
-  .tower-head > :nth-child(7),
-  .tower-head > :nth-child(9),
+  .tower-head > :nth-child(6),
+  .tower-head > :nth-child(8),
   .tower-row > :nth-child(4),
-  .tower-row > :nth-child(5),
-  .tower-row > :nth-child(7),
-  .tower-row > :nth-child(9) { display: none; }
+  .tower-row > :nth-child(6),
+  .tower-row > :nth-child(8) { display: none; }
   .tower-row { height: 46px; }
   .driver-acr { font-size: 14px; }
   .driver-name { font-size: 10px; }

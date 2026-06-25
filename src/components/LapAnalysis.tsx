@@ -11,9 +11,12 @@ interface Props {
   onToggle: (driverNumber: number) => void
   lapWindow: number
   onWindow: (n: number) => void
+  // When embedded in another view (Telemetry) that already has a driver
+  // selector, hide our own chip row to avoid a duplicate.
+  embedded?: boolean
 }
 
-export function LapAnalysis({ drivers, selected, onToggle, lapWindow, onWindow }: Props) {
+export function LapAnalysis({ drivers, selected, onToggle, lapWindow, onWindow, embedded = false }: Props) {
   const selectedDrivers = useMemo(
     () => drivers.filter((d) => selected.has(d.driverNumber)),
     [drivers, selected],
@@ -84,19 +87,21 @@ export function LapAnalysis({ drivers, selected, onToggle, lapWindow, onWindow }
         })}
       </div>
 
-      <div className="driver-chips">
-        {drivers.map((d) => (
-          <button
-            key={d.driverNumber}
-            className={`chip ${selected.has(d.driverNumber) ? 'on' : ''}`}
-            style={{ ['--team' as string]: teamHex(d.teamColour) }}
-            onClick={() => onToggle(d.driverNumber)}
-          >
-            <span className="swatch" />
-            {d.acronym}
-          </button>
-        ))}
-      </div>
+      {!embedded && (
+        <div className="driver-chips">
+          {drivers.map((d) => (
+            <button
+              key={d.driverNumber}
+              className={`chip ${selected.has(d.driverNumber) ? 'on' : ''}`}
+              style={{ ['--team' as string]: teamHex(d.teamColour) }}
+              onClick={() => onToggle(d.driverNumber)}
+            >
+              <span className="swatch" />
+              {d.acronym}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -7,9 +7,6 @@ interface Props {
   selected: Set<number> // which drivers to plot
   onToggle: (n: number) => void
   raceControl: RaceControlEntry[]
-  meetingName: string
-  sessionName: string
-  year: number | null
 }
 
 // SVG coordinate space (scaled to fit via viewBox).
@@ -47,7 +44,7 @@ function niceStep(max: number): number {
   return 30
 }
 
-export function GapChart({ drivers, selected, onToggle, raceControl, meetingName, sessionName, year }: Props) {
+export function GapChart({ drivers, selected, onToggle, raceControl }: Props) {
   const model = useMemo(() => {
     // Cumulative race time per lap for EVERY car, so the leader baseline is the
     // true race leader even when that car is toggled off.
@@ -122,11 +119,6 @@ export function GapChart({ drivers, selected, onToggle, raceControl, meetingName
       <div>
         <div className="gap-title">Gap to Leader</div>
         <div className="gap-sub">Gap to the race leader, lap by lap — toggle drivers below</div>
-      </div>
-      <div className="gap-badge">
-        <span className="gap-badge-name">{meetingName || '—'}</span>
-        {year != null && <span className="gap-badge-dim">{year}</span>}
-        <span className="gap-badge-ses">{(sessionName || '').toUpperCase()}</span>
       </div>
     </div>
   )

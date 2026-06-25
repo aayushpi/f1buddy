@@ -5,19 +5,17 @@ import { ViewTabs } from './components/ViewTabs'
 import { ReplayBar } from './components/ReplayBar'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { TimingTower } from './components/TimingTower'
-import { LapAnalysis } from './components/LapAnalysis'
 import { Ticker } from './components/Ticker'
 import { NoticeStack } from './components/NoticeStack'
 import { LiveEntryChoice } from './components/LiveEntryChoice'
 import { Home } from './components/Home'
 import { useRaceNotices } from './hooks/useRaceNotices'
 import { DriverFocus } from './components/DriverFocus'
-import { SettingsDrawer, type AppSettings } from './components/SettingsDrawer'
+import type { AppSettings } from './components/SettingsDrawer'
 import { TrackMap } from './components/views/TrackMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
-import { Strategy } from './components/views/Strategy'
-import { PitSimulator } from './components/views/PitSimulator'
+import { StrategySection } from './components/views/StrategySection'
 import { RaceControlView } from './components/views/RaceControlView'
 import { TrackStatus } from './components/TrackStatus'
 import { useRaceData, type ActiveView, type SimLive } from './store/useRaceData'
@@ -63,7 +61,12 @@ const DEFAULTS: Persisted = {
 function loadState(): Persisted {
   try {
     const raw = localStorage.getItem(LS_KEY)
-    if (raw) return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Persisted>) }
+    if (raw) {
+      const merged = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Persisted>) }
+      // Pit Simulator is now a sub-tab of Strategy — migrate any saved 'pit' view.
+      if ((merged.activeView as string) === 'pit') merged.activeView = 'strategy'
+      return merged
+    }
   } catch {
     /* ignore */
   }
@@ -72,12 +75,9 @@ function loadState(): Persisted {
 
 export default function App() {
   const [initial] = useState(loadState)
-  // Always seeded from the build/env default — never from saved state.
-  const [settings, setSettings] = useState<AppSettings>(() => ({
-    baseUrl: defaultConfig.baseUrl,
-    apiKey: '',
-    sessionKey: 'latest',
-  }))
+  // Data source is fixed to the build/env default (the same-origin proxy in
+  // production). There's no in-app override now that the settings drawer is gone.
+  const settings: AppSettings = { baseUrl: defaultConfig.baseUrl, apiKey: '', sessionKey: 'latest' }
   const [lapWindow, setLapWindow] = useState(initial.lapWindow)
   const [selected, setSelected] = useState<Set<number>>(new Set(initial.selected))
   // Gap-to-Leader visibility (its own set; defaults to the top 5 per session).
@@ -88,7 +88,6 @@ export default function App() {
   const [trackAlerts, setTrackAlerts] = useState(initial.trackAlerts)
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const gapSeeded = useRef<string | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
   // Spoiler-safe entry prompt for in-progress races (start-from-beginning vs live).
@@ -189,6 +188,36 @@ export default function App() {
     }
   }, [lapWindow, selected, activeView, notify, trackAlerts])
 
+  // Keep the screen awake while the app is open — it's meant to sit on an iPad
+  // through a whole session. The browser drops the lock on tab-switch / sleep,
+  // so we re-acquire it whenever the tab returns to the foreground.
+  useEffect(() => {
+    interface WakeLockSentinelLike { release: () => Promise<void> }
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> }
+    }
+    if (!nav.wakeLock) return
+    let lock: WakeLockSentinelLike | null = null
+    let cancelled = false
+    const acquire = async () => {
+      try {
+        lock = await nav.wakeLock!.request('screen')
+      } catch {
+        /* needs a user gesture or unsupported — ignore */
+      }
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !cancelled) acquire()
+    }
+    acquire()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+      lock?.release().catch(() => {})
+    }
+  }, [])
+
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
   const toggleIn = (set: (fn: (prev: Set<number>) => Set<number>) => void) => (n: number) =>
@@ -240,22 +269,13 @@ export default function App() {
     switch (activeView) {
       case 'timing':
         return (
-          <div className={`body ${focusDriver != null ? 'with-focus' : ''}`}>
+          <div className={`body single ${focusDriver != null ? 'with-focus' : ''}`}>
             <div className="col">
               <TimingTower
                 drivers={snapshot.drivers}
                 fastestDriver={snapshot.fastestLap?.driverNumber ?? null}
                 focused={focusDriver}
                 onFocus={toggleFocus}
-              />
-            </div>
-            <div className="col">
-              <LapAnalysis
-                drivers={snapshot.drivers}
-                selected={selected}
-                onToggle={toggleDriver}
-                lapWindow={lapWindow}
-                onWindow={setLapWindow}
               />
             </div>
             <AnimatePresence>
@@ -288,9 +308,6 @@ export default function App() {
               selected={gapSelected}
               onToggle={toggleGap}
               raceControl={snapshot.raceControlLog}
-              meetingName={snapshot.race.meetingName}
-              sessionName={snapshot.race.sessionName}
-              year={snapshot.race.year}
             />
           </div>
         )
@@ -302,28 +319,21 @@ export default function App() {
               telemetry={snapshot.telemetry}
               selected={selected}
               onToggle={toggleDriver}
+              lapWindow={lapWindow}
+              onWindow={setLapWindow}
             />
           </div>
         )
       case 'strategy':
         return (
           <div className="viewbody">
-            <Strategy
+            <StrategySection
               stints={snapshot.stints}
               pitLog={snapshot.pitLog}
-              grid={snapshot.grid}
               results={snapshot.results}
               currentLap={snapshot.race.currentLap}
               finished={snapshot.race.finished}
-            />
-          </div>
-        )
-      case 'pit':
-        return (
-          <div className="viewbody">
-            <PitSimulator
               drivers={snapshot.drivers}
-              stints={snapshot.stints}
               pitLoss={pitLossFor(snapshot.race.circuit, snapshot.race.countryName, snapshot.race.meetingName)}
               circuit={snapshot.race.meetingName || snapshot.race.circuit}
             />
@@ -334,7 +344,6 @@ export default function App() {
           <div className="viewbody">
             <RaceControlView
               log={snapshot.raceControlLog}
-              overtakes={snapshot.overtakes}
               radios={snapshot.radios}
               drivers={snapshot.drivers}
               notify={notify}
@@ -352,20 +361,11 @@ export default function App() {
   // No session picked yet → the landing page (countdown / live / load past).
   if (!selection) {
     return (
-      <>
-        <Home
-          config={config}
-          onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key, simulate: false })}
-          onReplay={(key, simulate) => setSelection({ mode: 'past', sessionKey: key, simulate })}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-        <SettingsDrawer
-          open={settingsOpen}
-          settings={settings}
-          onClose={() => setSettingsOpen(false)}
-          onApply={setSettings}
-        />
-      </>
+      <Home
+        config={config}
+        onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key, simulate: false })}
+        onReplay={(key, simulate) => setSelection({ mode: 'past', sessionKey: key, simulate })}
+      />
     )
   }
 
@@ -376,7 +376,6 @@ export default function App() {
       <ViewTabs
         active={activeView}
         onChange={setActiveView}
-        onSettings={() => setSettingsOpen(true)}
         onHome={goHome}
       />
 
@@ -391,13 +390,6 @@ export default function App() {
       <TrackStatus status={snapshot?.race.status ?? 'UNKNOWN'} connection={connection} />
 
       <NoticeStack notices={notices} onDismiss={dismiss} />
-
-      <SettingsDrawer
-        open={settingsOpen}
-        settings={settings}
-        onClose={() => setSettingsOpen(false)}
-        onApply={setSettings}
-      />
 
       {liveChoiceOpen && replay?.live && (
         <LiveEntryChoice

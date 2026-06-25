@@ -379,7 +379,7 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
       teamName: d.team_name,
       teamColour: teamColourFor(d.team_name, d.team_colour),
       position,
-      isLeader: position === 1,
+      isLeader: false, // assigned post-sort so exactly one car ever leads
       gapToLeader: interval?.gap_to_leader ?? null,
       interval: interval?.interval ?? null,
       lastLap,
@@ -423,6 +423,14 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     const pb = b.position ?? Number.POSITIVE_INFINITY
     if (pa !== pb) return pa - pb
     return (numericGap(a.gapToLeader) ?? 0) - (numericGap(b.gapToLeader) ?? 0)
+  })
+
+  // Exactly one leader: the car sorted to the front that actually holds a
+  // position. Deriving it here (rather than position===1 per driver) prevents a
+  // stale or duplicate LEADER tag when the position feed briefly lags behind a
+  // pit stop or an overtake.
+  drivers.forEach((d, i) => {
+    d.isLeader = i === 0 && d.position != null
   })
 
   const acrOf = new Map<number, string>()

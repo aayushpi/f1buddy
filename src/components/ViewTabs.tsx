@@ -7,18 +7,16 @@ const TABS: { id: ActiveView; label: string; icon: string }[] = [
   { id: 'gap', label: 'Gap to Leader', icon: '⋰' },
   { id: 'telemetry', label: 'Telemetry', icon: '∿' },
   { id: 'strategy', label: 'Strategy', icon: '▤' },
-  { id: 'pit', label: 'Pit Simulator', icon: '⏱' },
   { id: 'control', label: 'Race Control', icon: '⚑' },
 ]
 
 interface Props {
   active: ActiveView
   onChange: (v: ActiveView) => void
-  onSettings: () => void
   onHome: () => void
 }
 
-export function ViewTabs({ active, onChange, onSettings, onHome }: Props) {
+export function ViewTabs({ active, onChange, onHome }: Props) {
   return (
     <nav className="viewtabs panel">
       <button className="icon-btn viewtabs-home" onClick={onHome} title="Home" aria-label="Home">
@@ -38,12 +36,6 @@ export function ViewTabs({ active, onChange, onSettings, onHome }: Props) {
             <span className="viewtab-label">{t.label}</span>
           </button>
         ))}
-      </div>
-
-      <div className="viewtabs-controls">
-        <button className="icon-btn" onClick={onSettings} title="Settings" aria-label="Settings">
-          ⚙
-        </button>
       </div>
     </nav>
   )

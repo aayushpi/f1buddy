@@ -45,6 +45,17 @@ export function ReplayBar({ replay, currentLap }: Props) {
   }
   const cur = currentLap ?? 0
 
+  // Lap readout: before lights-out show "N/A" (pre-race standing), "0" during
+  // the formation lap, then the real lap number once racing.
+  const lapDisplay =
+    tNow < deadAirEnd
+      ? 'N/A'
+      : hasFormation && tNow < raceStartT
+        ? '0'
+        : currentLap != null
+          ? currentLap
+          : 'N/A'
+
   return (
     <div className="panel replaybar">
       <button className="replay-play" onClick={replay.toggle} aria-label={playing ? 'Pause' : 'Play'}>
@@ -57,7 +68,7 @@ export function ReplayBar({ replay, currentLap }: Props) {
         </button>
         <div className="replay-lap">
           <span className="kicker">Lap</span>
-          <span className="mono val">{currentLap ?? '—'}</span>
+          <span className="mono val">{lapDisplay}</span>
         </div>
         <button onClick={() => jumpToLap(cur + 1)} aria-label="Next lap">
           ›

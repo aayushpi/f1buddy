@@ -51,11 +51,6 @@ function Row({
 
       <TyreBadge compound={d.compound} age={d.tyreAge} />
 
-      <div className="stint-cell">
-        {d.stintLaps ?? '—'}
-        <span className="unit">L</span>
-      </div>
-
       <SectorLights sectors={d.sectors} />
 
       <div className={`laptime ${lapCls}`}>{formatLapTime(d.lastLap)}</div>
@@ -95,8 +90,11 @@ export function TimingTower({
         <div>P</div>
         <div className="col-driver">Driver</div>
         <div>Tyre</div>
-        <div>Stint</div>
-        <div>S1 · S2 · S3</div>
+        <div className="sector-head">
+          <span>S1</span>
+          <span>S2</span>
+          <span>S3</span>
+        </div>
         <div>Last Lap</div>
         <div>Interval</div>
         <div>Leader</div>

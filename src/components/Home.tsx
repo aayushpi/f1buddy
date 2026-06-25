@@ -9,7 +9,6 @@ interface Props {
   onEnterLive: (sessionKey: number) => void
   // simulate=true replays the session as if live; false loads the full race.
   onReplay: (sessionKey: number, simulate: boolean) => void
-  onOpenSettings: () => void
 }
 
 // "2d 04:11:09" / "04:11:09" / "11:09" — the largest non-zero unit leads.
@@ -41,7 +40,7 @@ function sessionLabel(s: CalendarSession): string {
   return `${s.meetingName} · ${s.sessionName}`
 }
 
-export function Home({ config, onEnterLive, onReplay, onOpenSettings }: Props) {
+export function Home({ config, onEnterLive, onReplay }: Props) {
   const cal = useCalendar(config)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -67,9 +66,6 @@ export function Home({ config, onEnterLive, onReplay, onOpenSettings }: Props) {
           <span className="home-logo">🏎️</span>
           <span className="home-wordmark">F1 Buddy</span>
         </div>
-        <button className="icon-btn" onClick={onOpenSettings} title="Settings" aria-label="Settings">
-          ⚙
-        </button>
       </header>
 
       <main className="home-main">
@@ -151,7 +147,12 @@ export function Home({ config, onEnterLive, onReplay, onOpenSettings }: Props) {
         </div>
       </main>
 
-      <footer className="home-foot">Powered by the OpenF1 API · live timing requires a key</footer>
+      <footer className="home-foot">
+        Powered by the OpenF1 API · made by{' '}
+        <a className="home-credit" href="https://aayush.fyi" target="_blank" rel="noopener noreferrer">
+          Aayush
+        </a>
+      </footer>
     </div>
   )
 }
