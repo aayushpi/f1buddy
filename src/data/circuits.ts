@@ -117,7 +117,13 @@ const ALIASES: Record<string, string> = {
   "mexicocity": "mx-1962",
   "br1940": "br-1940",
   "autdromojoscarlospaceinterlagos": "br-1940",
+  "interlagos": "br-1940", // OpenF1 circuit_short_name
   "saopaulo": "br-1940",
+  "sopaulo": "br-1940", // norm() drops the accent: "São Paulo" -> "sopaulo"
+  "saopaulograndprix": "br-1940",
+  "sopaulograndprix": "br-1940",
+  "brazil": "br-1940",
+  "braziliangrandprix": "br-1940",
   "ae2009": "ae-2009",
   "yasmarinacircuit": "ae-2009",
   "yasmarina": "ae-2009",
