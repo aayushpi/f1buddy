@@ -1913,8 +1913,10 @@ button {
 .hero-dot { filter: drop-shadow(0 0 8px rgba(25, 227, 255, 0.95)); }
 .home--live .hero-dot { filter: drop-shadow(0 0 8px rgba(34, 224, 122, 0.95)); }
 
-/* Upcoming/live circuit outline behind the hero text, with a dot lapping it. */
-.hero-track { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5%; }
+/* Upcoming/live circuit outline behind the hero text, with a dot lapping it.
+   Fades in once the circuit is resolved (no ECG placeholder flashes first). */
+.hero-track { position: absolute; inset: 0; width: 100%; height: 100%; padding: 5%; animation: cg-fade-in 0.6s ease-out both; }
+@keyframes cg-fade-in { from { opacity: 0; } to { opacity: 1; } }
 .hero-track-outline { opacity: 0.34; animation: cg-breathe 3.2s ease-in-out infinite; }
 .home--live .hero-track-outline { animation-duration: 1.9s; }
 @keyframes cg-breathe { 0%, 100% { opacity: 0.42; } 50% { opacity: 0.24; } }

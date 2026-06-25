@@ -296,9 +296,9 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
         >
           {(mode === 'live' || mode === 'next') && trackPoints ? (
             <TrackPulse points={trackPoints} mode={mode} />
-          ) : (
+          ) : mode === 'off' || mode === 'error' ? (
             <HeroTrace mode={mode} />
-          )}
+          ) : null /* loading / unresolved: no trace — the track fades in once ready */}
 
           {mode === 'live' && live && (
             <div className="hero-body">
