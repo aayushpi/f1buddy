@@ -12,6 +12,8 @@ export interface CalendarSession {
   sessionType: string
   meetingName: string // "Austrian Grand Prix" (falls back to circuit/country)
   countryName: string
+  circuitShortName: string // OpenF1 circuit_short_name, e.g. "Interlagos"
+  location: string // e.g. "São Paulo"
   start: number // ms epoch
   end: number // ms epoch
 }
@@ -70,6 +72,8 @@ export function useCalendar(config: OpenF1Config, reloadNonce = 0): Calendar {
           sessionType: s.session_type,
           meetingName: names.get(s.meeting_key) || s.circuit_short_name || s.country_name,
           countryName: s.country_name,
+          circuitShortName: s.circuit_short_name,
+          location: s.location,
           start: Date.parse(s.date_start),
           end: Date.parse(s.date_end),
         }))

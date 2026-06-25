@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { OpenF1Config } from '../api/openf1'
 import { useCalendar } from '../hooks/useCalendar'
 import { SessionPicker } from './SessionPicker'
 import { CardiogramMark, CG_HERO_PATH } from './Brand'
+import { findCircuit, type CircuitPt } from '../data/circuits'
 
 interface Props {
   config: OpenF1Config
@@ -72,6 +73,61 @@ function HeroTrace({ mode }: { mode: Mode }) {
   )
 }
 
+// Bounds + flipped viewBox for a circuit outline, mirroring the Track Map view
+// so the shape reads upright. Returns an SVG path (closed) and a viewBox.
+function trackGeometry(points: CircuitPt[]) {
+  const xs = points.map((p) => p[0])
+  const ys = points.map((p) => p[1])
+  let minX = Math.min(...xs)
+  let maxX = Math.max(...xs)
+  let minY = Math.min(...ys)
+  let maxY = Math.max(...ys)
+  const padX = (maxX - minX) * 0.1 + 60
+  const padY = (maxY - minY) * 0.1 + 60
+  minX -= padX
+  maxX += padX
+  minY -= padY
+  maxY += padY
+  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ') + ' Z'
+  return {
+    d,
+    viewBox: `${minX} ${-maxY} ${maxX - minX} ${maxY - minY}`, // Y flipped via the group transform below
+    scale: Math.max(maxX - minX, maxY - minY),
+  }
+}
+
+/**
+ * The upcoming/live circuit outline with a glowing pulse lapping it — the
+ * cardiogram beat tracing the actual track. Outline breathes; the dot laps.
+ */
+function TrackPulse({ points, mode }: { points: CircuitPt[]; mode: Mode }) {
+  const geo = useMemo(() => trackGeometry(points), [points])
+  const isLive = mode === 'live'
+  const stroke = isLive ? 'var(--green)' : 'var(--accent)'
+  const dot = isLive ? '#eafff3' : '#ffffff'
+  return (
+    <svg className="hero-track" viewBox={geo.viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <g transform="scale(1,-1)">
+        <path
+          id="cg-track-path"
+          className="hero-track-outline"
+          d={geo.d}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={geo.scale * 0.006}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle r={geo.scale * 0.02} fill={dot} className="hero-dot">
+          <animateMotion dur={isLive ? '6s' : '9s'} repeatCount="indefinite" rotate="auto">
+            <mpath href="#cg-track-path" />
+          </animateMotion>
+        </circle>
+      </g>
+    </svg>
+  )
+}
+
 function StatusPill({ mode }: { mode: Mode }) {
   const year = new Date().getFullYear()
   const map: Record<Mode, { cls: string; label: string; pulse?: boolean }> = {
@@ -125,6 +181,15 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
           ? 'next'
           : 'off'
 
+  // The track outline to pulse: the live race's, else the next race's.
+  const featured = live ?? next
+  const trackPoints = useMemo(() => {
+    if (!featured) return null
+    const c = findCircuit(featured.circuitShortName, featured.location, featured.meetingName, featured.countryName)
+    return c?.points ?? null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featured?.sessionKey])
+
   // Off-season promotes "Replay the last race" with an accent border.
   const replayPromoted = mode === 'off'
 
@@ -150,7 +215,11 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         >
-          <HeroTrace mode={mode} />
+          {(mode === 'live' || mode === 'next') && trackPoints ? (
+            <TrackPulse points={trackPoints} mode={mode} />
+          ) : (
+            <HeroTrace mode={mode} />
+          )}
 
           {mode === 'live' && live && (
             <div className="hero-body">
