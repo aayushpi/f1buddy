@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
+import { Analytics } from '@vercel/analytics/react'
 import './styles/global.css'
 import { ViewTabs } from './components/ViewTabs'
 import { ReplayBar } from './components/ReplayBar'
@@ -361,11 +362,14 @@ export default function App() {
   // No session picked yet → the landing page (countdown / live / load past).
   if (!selection) {
     return (
-      <Home
-        config={config}
-        onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key, simulate: false })}
-        onReplay={(key, simulate) => setSelection({ mode: 'past', sessionKey: key, simulate })}
-      />
+      <>
+        <Home
+          config={config}
+          onEnterLive={(key) => setSelection({ mode: 'live', sessionKey: key, simulate: false })}
+          onReplay={(key, simulate) => setSelection({ mode: 'past', sessionKey: key, simulate })}
+        />
+        <Analytics />
+      </>
     )
   }
 
@@ -402,6 +406,8 @@ export default function App() {
           onJumpToLive={jumpToLive}
         />
       )}
+
+      <Analytics />
     </div>
   )
 }
