@@ -1,11 +1,11 @@
-# F1 Buddy 🏎️
+# Cardiogram 🏎️
 
 A futuristic, data-dense **race-companion dashboard built for iPad in landscape**.
 Run it on a second screen while you watch a Formula 1 race and get a live timing
 feed similar to the F1 broadcast — gaps, tyres, stints, sectors and lap-time
 analysis — rendered in a clean, dark, animated UI.
 
-![F1 Buddy dashboard](docs/preview.png)
+![Cardiogram dashboard](docs/preview.png)
 
 ## Views
 

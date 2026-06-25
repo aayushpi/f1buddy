@@ -64,7 +64,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
       <header className="home-top">
         <div className="home-brand">
           <span className="home-logo">🏎️</span>
-          <span className="home-wordmark">F1 Buddy</span>
+          <span className="home-wordmark">Cardiogram</span>
         </div>
       </header>
 

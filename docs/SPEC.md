@@ -1,4 +1,4 @@
-# F1 Buddy — Specification
+# Cardiogram — Specification
 
 A race-companion dashboard for Formula 1, built on the [OpenF1](https://openf1.org)
 API. Designed for iPad landscape, responsive down to phones.
