@@ -118,21 +118,21 @@ export function ReplayBar({ replay, currentLap }: Props) {
         </span>
       </div>
 
-      <div className="seg replay-speeds">
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            className={s === speed ? 'active' : ''}
-            // At the live edge you can only watch in real time — there's no
-            // buffered-ahead data to fast-forward into.
-            disabled={atLive && s !== 1}
-            title={atLive && s !== 1 ? 'Unavailable while watching live' : undefined}
-            onClick={() => replay.setSpeed(s)}
-          >
-            {s}×
-          </button>
-        ))}
-      </div>
+      {/* Live / sim-live always run at 1× — no speed selector, just pause +
+          jump-to-live. Finished replays keep the full speed control. */}
+      {!live && (
+        <div className="seg replay-speeds">
+          {SPEEDS.map((s) => (
+            <button
+              key={s}
+              className={s === speed ? 'active' : ''}
+              onClick={() => replay.setSpeed(s)}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      )}
 
       {live && (
         <button

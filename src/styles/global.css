@@ -594,9 +594,22 @@ button {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 6px;
 }
+/* The tabs live in a horizontally-scrolling track so they never wrap to a
+   second line when the row is tight (e.g. iPad). */
+.viewtabs-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.viewtabs-scroll::-webkit-scrollbar { display: none; }
 /* Connection dot + settings, pushed to the right edge of the nav row. */
 .viewtabs-controls {
   margin-left: auto;
@@ -640,6 +653,23 @@ button {
 .status-dot-label.sd-amber { color: var(--amber); }
 .status-dot-label.sd-red { color: var(--red); }
 .status-dot-label.sd-white { color: #e9eef5; }
+
+/* Track-status flag badge, pinned bottom-left over the ticker. */
+.track-status {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 13px;
+  background: rgba(5, 7, 13, 0.78);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
 .viewtab {
   position: relative;
   border: 0;
@@ -654,6 +684,8 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
+  flex: 0 0 auto;
   transition: color 0.18s ease;
 }
 .viewtab:hover { color: var(--text); }
@@ -807,8 +839,13 @@ button {
 .grid-row .laps { color: var(--muted); font-size: 11px; }
 
 /* ============================ Race control ============================ */
-.control-view { flex: 1 1 auto; display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: auto 1fr; gap: 12px; min-height: 0; }
+.control-view { flex: 1 1 auto; display: grid; grid-template-columns: 1.3fr 0.9fr 0.95fr; grid-template-rows: auto 1fr; gap: 12px; min-height: 0; }
 .rc-notify { grid-column: 1 / -1; }
+/* Weather lives as the third column inside Race Control. */
+.control-view > .weatherview { min-height: 0; }
+.control-view .wx-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 12px 12px; }
+.control-view .wx-value { font-size: 22px; }
+.control-view .wx-trends { grid-template-columns: 1fr; gap: 10px; padding: 0 12px 12px; }
 .rc-notify .panel-title { padding-bottom: 8px; }
 .rc-notify-hint { margin-left: 10px; text-transform: none; letter-spacing: 0.02em; font-weight: 600; color: var(--muted); }
 .rc-track-toggle { margin-left: auto; --team: var(--amber); text-transform: none; cursor: pointer; }
@@ -1534,21 +1571,63 @@ button {
 /* ============================ Pit Simulator ============================ */
 .ps-panel { display: flex; flex-direction: column; min-height: 0; }
 .ps-circuit { color: var(--text); font-weight: 700; letter-spacing: 0.04em; text-transform: none; }
-.ps-losses { display: flex; gap: 6px; margin-left: auto; }
+
+/* Controls toolbar under the title: editable pit-time chips + "pit all". */
+.ps-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 0 16px 10px; }
+.ps-toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ps-toolbar-label { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
 .ps-loss-chip {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
+  background: var(--panel-strong);
+  color: var(--text-dim);
+  cursor: pointer;
 }
+.ps-loss-chip:hover { border-color: var(--accent); }
 .ps-loss-chip.green { color: var(--green); border-color: rgba(34, 224, 122, 0.4); }
 .ps-loss-chip.vsc { color: var(--yellow); border-color: rgba(246, 211, 63, 0.4); }
 .ps-loss-chip.sc { color: var(--amber); border-color: rgba(255, 157, 47, 0.4); }
+
+/* Pit-time editor modal */
+.ps-modal-scrim {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(5, 7, 13, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+}
+.ps-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 22px 26px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  min-width: 240px;
+}
+.ps-modal-title { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.ps-stepper { display: flex; align-items: center; gap: 18px; }
+.ps-stepper button {
+  width: 46px; height: 46px; border-radius: 12px;
+  border: 1px solid var(--border-strong); background: var(--panel-strong);
+  color: var(--text); font-size: 24px; font-weight: 700; line-height: 1;
+}
+.ps-stepper button:hover { border-color: var(--accent); }
+.ps-stepper-val { font-size: 34px; font-weight: 800; min-width: 86px; text-align: center; }
+.ps-stepper-val small { font-size: 16px; color: var(--muted); margin-left: 2px; }
+.ps-modal-done {
+  padding: 9px 26px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong); background: var(--panel-strong);
+  color: var(--text); font-weight: 700;
+}
+.ps-modal-done:hover { border-color: var(--accent); }
+
 .ps-clear {
-  margin-left: 12px;
+  margin-left: auto;
   background: rgba(255, 59, 70, 0.12);
   border: 1px solid rgba(255, 59, 70, 0.4);
   color: var(--red);
@@ -1968,12 +2047,14 @@ button {
   .strat-grid,
   .rc-log,
   .rc-overtakes,
-  .rc-radio { flex: 0 0 auto; }
+  .rc-radio,
+  .control-view > .weatherview { flex: 0 0 auto; }
   .gantt-body,
   .strat-scroll { max-height: 44vh; }
 
   /* ---- Weather: 2-up stats, single-column trends, view scrolls ---- */
   .weatherview { overflow-y: auto; }
+  .control-view .wx-stats { grid-template-columns: repeat(2, 1fr); padding: 8px 10px 10px; }
   .wx-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px 10px 10px; }
   .wx-stat { padding: 12px; }
   .wx-value { font-size: 24px; }
@@ -1984,7 +2065,7 @@ button {
   .gap-title { font-size: 17px; }
 
   /* ---- Pit simulator: stack the two columns ---- */
-  .ps-losses { flex-wrap: wrap; }
+  .ps-toolbar { gap: 8px 14px; padding: 0 10px 8px; }
   .ps-links { display: none; } /* connectors only make sense side-by-side */
   .ps-cols { grid-template-columns: 1fr; gap: 8px; padding: 0 8px 8px; overflow-y: auto; }
   .ps-col { flex: 0 0 auto; }

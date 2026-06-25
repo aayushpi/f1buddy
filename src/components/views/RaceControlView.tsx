@@ -1,6 +1,14 @@
 import { useRef, useState } from 'react'
-import type { DriverState, OvertakeEvent, RaceControlEntry, RadioClip } from '../../api/types'
+import type {
+  ApiWeather,
+  DriverState,
+  OvertakeEvent,
+  RaceControlEntry,
+  RadioClip,
+  WeatherPoint,
+} from '../../api/types'
 import { formatRaceMessage, teamHex, timeOfDay } from '../../utils/format'
+import { WeatherView } from './WeatherView'
 
 interface Props {
   log: RaceControlEntry[]
@@ -13,6 +21,8 @@ interface Props {
   // Critical track-wide bulletins (flags / safety car) popups, on by default.
   trackAlerts: boolean
   onToggleTrackAlerts: () => void
+  weather: ApiWeather | null
+  weatherHistory: WeatherPoint[]
 }
 
 function flagClass(entry: RaceControlEntry): string {
@@ -59,6 +69,8 @@ export function RaceControlView({
   onToggleNotify,
   trackAlerts,
   onToggleTrackAlerts,
+  weather,
+  weatherHistory,
 }: Props) {
   return (
     <div className="control-view">
@@ -164,6 +176,8 @@ export function RaceControlView({
           </div>
         </div>
       </div>
+
+      <WeatherView current={weather} history={weatherHistory} />
     </div>
   )
 }

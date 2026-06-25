@@ -70,8 +70,9 @@ on the nav returns to the home screen.
 
 ## 4. Scrubber (`components/ReplayBar.tsx`)
 
-- Play/pause, 1–12× speed, lap-step ‹ ›, and a scrubber with **per-lap tick
-  markers** you can tap to jump.
+- Play/pause, lap-step ‹ ›, and a scrubber with **per-lap tick markers** you can
+  tap to jump. Finished replays add a 1–12× speed selector; live and sim-live
+  run at 1× (the selector is hidden — just pause + jump-to-live).
 - **Pre-race** (standing/grid) is shaded as a hatched band; the **formation lap
   (“lap 0”)** is a distinct amber band, with a lights-out boundary line at lap 1.
 - Lap markers reflect only data revealed so far; future laps are hidden.
@@ -97,10 +98,11 @@ still reflects track-wide flags. Both preferences persist across sessions.
 ## 6. Chrome
 
 - **Nav row** (`components/ViewTabs.tsx`): a left-aligned **⌂ home** button, the
-  view tabs, plus a right-aligned **track-status light** (glowing dot: clear /
-  yellow / SC·VSC / red / chequered, with a label for the states that matter;
-  falls back to connection state before a session is live) and the **settings**
-  gear.
+  horizontally-scrolling view tabs, and the **settings** gear. The tab track
+  scrolls rather than wrapping when space is tight.
+- **Track-status badge** (`components/TrackStatus.tsx`): a glowing flag light
+  (Track Clear / yellow / SC·VSC / red / chequered, falling back to connection
+  state) pinned **bottom-left**.
 - **No persistent header**: the lap is shown in the scrubber; flag status is the
   nav dot. A weather strip is the only footer.
 
@@ -108,7 +110,8 @@ still reflects track-wide flags. Both preferences persist across sessions.
 
 `Timing` (tower + lap-time analysis), `Track Map`, `Gap to Leader`,
 `Telemetry`, `Strategy`, `Pit Simulator` (what-if pit-stop order vs. live),
-`Race Control`, `Weather`.
+`Race Control` (with overtakes, team radio, per-driver alert opt-in, and the
+weather panel folded in).
 
 - **Strategy:** the stint Gantt colours each set by `tyre_age_at_start` — sets
   that started (near-)fresh (<2 laps) glow in vivid compound colours, used sets

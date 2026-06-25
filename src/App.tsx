@@ -19,7 +19,7 @@ import { Telemetry } from './components/views/Telemetry'
 import { Strategy } from './components/views/Strategy'
 import { PitSimulator } from './components/views/PitSimulator'
 import { RaceControlView } from './components/views/RaceControlView'
-import { WeatherView } from './components/views/WeatherView'
+import { TrackStatus } from './components/TrackStatus'
 import { useRaceData, type ActiveView, type SimLive } from './store/useRaceData'
 import { defaultConfig } from './api/openf1'
 import { pitLossFor } from './data/pitTimes'
@@ -341,13 +341,9 @@ export default function App() {
               onToggleNotify={toggleNotify}
               trackAlerts={trackAlerts}
               onToggleTrackAlerts={() => setTrackAlerts((v) => !v)}
+              weather={snapshot.race.weather}
+              weatherHistory={snapshot.weatherHistory}
             />
-          </div>
-        )
-      case 'weather':
-        return (
-          <div className="viewbody">
-            <WeatherView current={snapshot.race.weather} history={snapshot.weatherHistory} />
           </div>
         )
     }
@@ -380,8 +376,6 @@ export default function App() {
       <ViewTabs
         active={activeView}
         onChange={setActiveView}
-        connection={connection}
-        status={snapshot?.race.status ?? 'UNKNOWN'}
         onSettings={() => setSettingsOpen(true)}
         onHome={goHome}
       />
@@ -393,6 +387,8 @@ export default function App() {
       </ErrorBoundary>
 
       <Ticker race={snapshot?.race} />
+
+      <TrackStatus status={snapshot?.race.status ?? 'UNKNOWN'} connection={connection} />
 
       <NoticeStack notices={notices} onDismiss={dismiss} />
 

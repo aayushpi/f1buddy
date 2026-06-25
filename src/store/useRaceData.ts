@@ -20,7 +20,6 @@ export type ActiveView =
   | 'strategy'
   | 'pit'
   | 'control'
-  | 'weather'
 
 // Dev-only "simulated live": replay a finished session as if it were happening
 // now. See docs/proposals/simlive.md. `startSec` is how far into the race the

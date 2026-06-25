@@ -92,6 +92,18 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
   // driverNumber -> the kind of stop being simulated for that car.
   const [pits, setPits] = useState<Map<number, PitType>>(new Map())
 
+  // Editable pit-loss times (seconds). Seeded from the circuit defaults; reset
+  // when the circuit/session changes. A modal lets the user tune them by hand.
+  const [loss, setLoss] = useState<PitLoss>(pitLoss)
+  const [editing, setEditing] = useState<PitType | null>(null)
+  useEffect(() => {
+    setLoss(pitLoss)
+    // Only re-seed on a new circuit, not on every render (pitLoss is rebuilt each time).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circuit])
+  const adjust = (type: PitType, delta: number) =>
+    setLoss((prev) => ({ ...prev, [type]: Math.max(0, Math.round((prev[type] + delta) * 10) / 10) }))
+
   // driverNumber -> ordered compounds run this race (oldest stint first).
   const tyresByDriver = useMemo(() => {
     const m = new Map<number, string[]>()
@@ -114,6 +126,11 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
 
   const clearAll = () => setPits(new Map())
 
+  // Pit every car with the given stop type, so the user can then toggle a few
+  // off to compare scenarios.
+  const pitAll = (type: PitType) =>
+    setPits(new Map(drivers.map((d) => [d.driverNumber, type])))
+
   // Live order (column one) — drivers arrive already sorted by position. This
   // order is the single source of truth: column two is built from it, so with
   // no stop simulated it mirrors column one exactly and never drifts on its own
@@ -125,7 +142,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
   // gaps), then add the chosen pit loss to whoever is pitting and re-sort. No
   // pits => identical order, zero deltas, flat connector lines.
   const projected = useMemo<ProjectedRow[]>(() => {
-    const cost: Record<PitType, number> = { green: pitLoss.green, vsc: pitLoss.vsc, sc: pitLoss.sc }
+    const cost: Record<PitType, number> = { green: loss.green, vsc: loss.vsc, sc: loss.sc }
 
     const racing: { d: DriverState; base: number; t: number; pitted: PitType | null; rank: number }[] = []
     const trailing: DriverState[] = [] // lapped / retired — kept at the back, in live order
@@ -168,7 +185,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
       rows.push({ d, position: pos, interval: null, leaderGap: null, pitted: pits.get(d.driverNumber) ?? null, delta: null })
     }
     return rows
-  }, [live, pits, pitLoss])
+  }, [live, pits, loss])
 
   const pitCount = pits.size
 
@@ -252,16 +269,30 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
         <span className="dot" />
         Pit Simulator
         <span className="ps-circuit">{circuit}</span>
-        <div className="ps-losses">
-          <span className="ps-loss-chip green">PIT {pitLoss.green.toFixed(0)}s</span>
-          <span className="ps-loss-chip vsc">VSC {pitLoss.vsc.toFixed(0)}s</span>
-          <span className="ps-loss-chip sc">SC {pitLoss.sc.toFixed(0)}s</span>
-        </div>
         {pitCount > 0 && (
           <button className="ps-clear" onClick={clearAll}>
             Clear ({pitCount})
           </button>
         )}
+      </div>
+
+      <div className="ps-toolbar">
+        <div className="ps-toolbar-group">
+          <span className="ps-toolbar-label">Pit time · tap to edit</span>
+          {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
+            <button key={t} className={`ps-loss-chip ${t}`} onClick={() => setEditing(t)} title="Tap to change">
+              {PIT_LABEL[t]} {loss[t].toFixed(0)}s
+            </button>
+          ))}
+        </div>
+        <div className="ps-toolbar-group">
+          <span className="ps-toolbar-label">Pit all</span>
+          {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
+            <button key={t} className={`ps-btn ${t}`} onClick={() => pitAll(t)} title={`Pit every car (${PIT_LABEL[t]})`}>
+              {PIT_LABEL[t]} ALL
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="ps-cols">
@@ -315,7 +346,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
                           key={t}
                           className={`ps-btn ${t} ${active === t ? 'on' : ''}`}
                           onClick={() => setPit(d.driverNumber, t)}
-                          title={`${PIT_LABEL[t]} · +${pitLoss[t].toFixed(0)}s`}
+                          title={`${PIT_LABEL[t]} · +${loss[t].toFixed(0)}s`}
                         >
                           {PIT_LABEL[t]}
                         </button>
@@ -399,6 +430,22 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
           </div>
         </div>
       </div>
+
+      {editing && (
+        <div className="ps-modal-scrim" onClick={() => setEditing(null)}>
+          <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ps-modal-title">{PIT_LABEL[editing]} time loss</div>
+            <div className="ps-stepper">
+              <button onClick={() => adjust(editing, -1)} aria-label="Decrease">−</button>
+              <span className="ps-stepper-val mono">
+                {loss[editing].toFixed(0)}<small>s</small>
+              </span>
+              <button onClick={() => adjust(editing, +1)} aria-label="Increase">+</button>
+            </div>
+            <button className="ps-modal-done" onClick={() => setEditing(null)}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

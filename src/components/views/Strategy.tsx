@@ -38,8 +38,10 @@ function StintGantt({ stints, maxLap }: { stints: StintRow[]; maxLap: number }) 
               {row.segments.map((s, i) => {
                 // tyre_age_at_start: 0/1 = (near-)fresh → bright; >1 = used → normal.
                 const fresh = s.ageAtStart < 2
-                // Tyre life = laps already on the set + laps run this stint.
-                const life = s.ageAtStart + s.laps
+                // Tyre life = laps already on the set + laps completed this stint.
+                // s.laps counts the in-progress lap, so subtract it: a fresh set
+                // at the start of a stint reads 0, not 1 (matches DriverState.tyreAge).
+                const life = s.ageAtStart + Math.max(0, s.laps - 1)
                 return (
                   <div
                     key={i}
