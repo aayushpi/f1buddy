@@ -14,6 +14,8 @@ export type DataMode = 'live' | 'idle'
 export type Connection = 'idle' | 'connecting' | 'live' | 'replay' | 'error'
 export type ActiveView =
   | 'timing'
+  | 'practice'
+  | 'qualifying'
   | 'map'
   | 'gap'
   | 'telemetry'
