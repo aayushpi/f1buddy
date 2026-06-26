@@ -2222,6 +2222,9 @@ button {
 .session-clock-time { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
 .session-clock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 .session-clock.ended .session-clock-dot { background: var(--muted); box-shadow: none; animation: none; }
+/* Compact fit when it sits beside the scrubber (replacing the time-of-day). */
+.replay-scrub .session-clock { flex: 0 0 auto; padding: 3px 9px; }
+.replay-scrub .session-clock-time { font-size: 13px; }
 .practice-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .practice-empty { padding: 28px 16px; color: var(--muted); font-size: 13px; text-align: center; }
 

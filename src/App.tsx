@@ -276,9 +276,6 @@ export default function App() {
               drivers={snapshot.drivers}
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
-              endMs={snapshot.race.sessionEnd}
-              nowMs={replay?.tNow ?? null}
-              live={replay?.atLive ?? false}
             />
           </div>
         )
@@ -289,9 +286,6 @@ export default function App() {
               drivers={snapshot.drivers}
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
-              endMs={snapshot.race.sessionEnd}
-              nowMs={replay?.tNow ?? null}
-              live={replay?.atLive ?? false}
             />
           </div>
         )
@@ -408,7 +402,13 @@ export default function App() {
         sessionType={sessionType}
       />
 
-      {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
+      {replay && (
+        <ReplayBar
+          replay={replay}
+          currentLap={snapshot?.race.currentLap ?? null}
+          sessionEnd={snapshot?.race.sessionEnd ?? null}
+        />
+      )}
 
       <ErrorBoundary key={activeView} label="This view hit an error">
         {renderView()}

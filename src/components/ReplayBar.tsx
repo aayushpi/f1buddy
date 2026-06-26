@@ -1,14 +1,11 @@
 import { SPEEDS, type ReplayControls } from '../store/useRaceData'
+import { SessionClock } from './SessionClock'
 
 interface Props {
   replay: ReplayControls
   currentLap: number | null
-}
-
-function clock(ms: number): string {
-  const d = new Date(ms)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleTimeString('en-GB', { hour12: false })
+  // Scheduled session end (epoch ms), for the countdown beside the scrubber.
+  sessionEnd: number | null
 }
 
 function elapsed(ms: number): string {
@@ -17,7 +14,7 @@ function elapsed(ms: number): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function ReplayBar({ replay, currentLap }: Props) {
+export function ReplayBar({ replay, currentLap, sessionEnd }: Props) {
   const { tMin, tMax, tNow, playing, speed, lapMarkers, live, atLive, formationStart } = replay
   const dur = tMax - tMin || 1
   const pct = ((tNow - tMin) / dur) * 100
@@ -76,7 +73,7 @@ export function ReplayBar({ replay, currentLap }: Props) {
       </div>
 
       <div className="replay-scrub">
-        <span className="mono time">{clock(tNow)}</span>
+        <SessionClock endMs={sessionEnd} nowMs={tNow} />
         <div className="scrub-wrap">
           <div className="lap-ticks">
             {showPreLabel && (

@@ -2,16 +2,11 @@ import { useMemo, useState } from 'react'
 import type { DriverState, StintRow } from '../../api/types'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
 import { buildLongRuns, buildTimesheet, type Run } from '../../utils/practice'
-import { SessionClock } from '../SessionClock'
 
 interface Props {
   drivers: DriverState[]
   stints: StintRow[]
   sessionName: string
-  // Session end + current replay-clock time, for the countdown.
-  endMs: number | null
-  nowMs: number | null
-  live: boolean
 }
 
 type Sub = 'quali' | 'long'
@@ -22,7 +17,7 @@ type Sub = 'quali' | 'long'
  *   - Long Runs:  clean race-pace averages and tyre degradation per stint.
  * Shown only for Practice sessions (gated by the caller).
  */
-export function PracticeView({ drivers, stints, sessionName, endMs, nowMs, live }: Props) {
+export function PracticeView({ drivers, stints, sessionName }: Props) {
   const [sub, setSub] = useState<Sub>('quali')
 
   return (
@@ -37,7 +32,6 @@ export function PracticeView({ drivers, stints, sessionName, endMs, nowMs, live 
           </button>
         </div>
         <span className="practice-session">{sessionName}</span>
-        <SessionClock endMs={endMs} nowMs={nowMs} live={live} />
       </div>
 
       {sub === 'quali' ? (

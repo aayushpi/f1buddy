@@ -2,16 +2,11 @@ import { Fragment, useMemo, useState } from 'react'
 import type { DriverState, StintRow } from '../../api/types'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
 import { buildQualifying, teammatePairs, type QualiRow, type Zone } from '../../utils/qualifying'
-import { SessionClock } from '../SessionClock'
 
 interface Props {
   drivers: DriverState[]
   stints: StintRow[]
   sessionName: string
-  // Session end + current replay-clock time, for the countdown.
-  endMs: number | null
-  nowMs: number | null
-  live: boolean
 }
 
 type Sub = 'knockout' | 'sectors'
@@ -24,7 +19,7 @@ type Sub = 'knockout' | 'sectors'
  *     table) and the intra-team qualifying head-to-head.
  * Shown only for Qualifying sessions (gated by the caller).
  */
-export function QualifyingView({ drivers, stints, sessionName, endMs, nowMs, live }: Props) {
+export function QualifyingView({ drivers, stints, sessionName }: Props) {
   const [sub, setSub] = useState<Sub>('knockout')
 
   return (
@@ -39,7 +34,6 @@ export function QualifyingView({ drivers, stints, sessionName, endMs, nowMs, liv
           </button>
         </div>
         <span className="practice-session">{sessionName}</span>
-        <SessionClock endMs={endMs} nowMs={nowMs} live={live} />
       </div>
 
       {sub === 'knockout' ? (
@@ -114,6 +108,7 @@ function Knockout({ drivers, stints }: { drivers: DriverState[]; stints: StintRo
               <th className="ts-num">Gap</th>
               <th className="ts-num">Int</th>
               <th className="ts-num">To line</th>
+              <th className="ts-num" title="Theoretical best — sum of this driver's own best sectors">Theo</th>
               <th className="ts-num">Trap</th>
             </tr>
           </thead>
@@ -125,7 +120,7 @@ function Knockout({ drivers, stints }: { drivers: DriverState[]; stints: StintRo
                 <Fragment key={r.driverNumber}>
                   {showDivider && (
                     <tr className={`q-divider q-divider-${r.zone}`}>
-                      <td colSpan={8}>{ZONE_LABEL[r.zone]}</td>
+                      <td colSpan={9}>{ZONE_LABEL[r.zone]}</td>
                     </tr>
                   )}
                   <tr className={`q-row q-${r.zone} ${r.onBubble ? 'q-bubble' : ''} ${r.bestLap == null ? 'ts-empty' : ''}`}>
@@ -146,6 +141,9 @@ function Knockout({ drivers, stints }: { drivers: DriverState[]; stints: StintRo
                     <td className="ts-num dim">{r.intervalAhead == null ? '—' : formatDelta(r.intervalAhead)}</td>
                     <td className="ts-num">
                       <ToLine value={r.toLine} zone={r.zone} />
+                    </td>
+                    <td className="ts-num dim" title="Theoretical best — sum of this driver's own best sectors">
+                      {formatLapTime(r.idealLap)}
                     </td>
                     <td className="ts-num dim">{r.speedTrap == null ? '—' : `${Math.round(r.speedTrap)}`}</td>
                   </tr>
