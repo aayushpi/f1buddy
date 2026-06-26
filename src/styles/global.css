@@ -2001,7 +2001,24 @@ button {
   text-align: left;
   transition: border-color 0.14s, background 0.14s;
 }
+.gp-card { position: relative; }
 .gp-card:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.07); }
+/* Future events haven't run — nothing to load yet — so dim them back. */
+.gp-card.future { opacity: 0.4; }
+.gp-card.future:hover { opacity: 0.7; }
+/* The weekend that's happening now: lift it with an accent ring + glow. */
+.gp-card.current {
+  border-color: var(--green);
+  background: rgba(34, 224, 122, 0.07);
+  box-shadow: 0 0 0 1px var(--green), 0 0 22px rgba(34, 224, 122, 0.18);
+}
+.gp-now {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--green); padding: 3px 7px; border-radius: 999px;
+  background: rgba(34, 224, 122, 0.12); border: 1px solid var(--green);
+}
+.gp-flag { font-size: 14px; margin-right: 6px; letter-spacing: 0; }
 .gp-thumb {
   height: 88px;
   margin-bottom: 10px;
@@ -2193,6 +2210,18 @@ button {
   margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
   text-transform: uppercase; color: var(--muted);
 }
+.session-clock {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px; border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--panel-strong);
+}
+.session-clock-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.6s infinite;
+}
+.session-clock-time { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.session-clock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.session-clock.ended .session-clock-dot { background: var(--muted); box-shadow: none; animation: none; }
 .practice-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
 .practice-empty { padding: 28px 16px; color: var(--muted); font-size: 13px; text-align: center; }
 
@@ -2289,6 +2318,36 @@ button {
 .rd-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .rd-legend .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.18); }
 .rd-avgline-key { width: 14px; border-top: 1px dashed var(--accent); }
+.rd-toggle { margin-left: 12px; }
+.rd-toggle button { padding: 4px 10px; font-size: 10px; }
+/* Average pace spelled out just above the dotted line in the graph view. */
+.rd-avglabel {
+  position: absolute; left: 0; margin-bottom: 2px; z-index: 2;
+  font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent);
+  background: rgba(0, 0, 0, 0.35); padding: 1px 6px; border-radius: 5px;
+}
+/* Per-lap table (the default long-run detail view). */
+.rd-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.rd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rd-table thead th {
+  position: sticky; top: 0; background: var(--panel); z-index: 1;
+  text-align: left; padding: 6px 10px; font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.rd-table tbody td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.rd-table tbody tr:hover { background: var(--panel-strong); }
+.rd-t-lap { width: 48px; font-family: var(--mono); color: var(--muted); }
+.rd-t-time { font-family: var(--mono); font-weight: 800; }
+.rd-t-note { color: var(--text-dim); font-size: 11px; text-transform: capitalize; }
+.rd-table tr.excl td { opacity: 0.5; }
+.rd-table tr.excl .rd-t-time { color: var(--text-dim); font-weight: 600; }
+.rd-avg-row td {
+  border-top: 1px solid var(--border-strong); border-bottom: none;
+  background: var(--panel-strong); font-weight: 800;
+}
+.rd-avg-row .rd-t-lap { color: var(--accent); font-size: 15px; }
+.rd-avg-row .rd-t-time { color: var(--accent); }
+.rd-avg-row .rd-t-note { color: var(--muted); opacity: 1; text-transform: none; }
 
 /* -------------------------------------------------------------------------
    Qualifying view (Qualifying sessions only): the knockout grid with the

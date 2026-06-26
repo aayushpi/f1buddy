@@ -220,42 +220,86 @@ function deriveStatus(rc: ApiRaceControl[]): {
   finished: boolean
 } {
   const sorted = [...rc].sort((a, b) => (a.date < b.date ? -1 : 1))
-  let status: TrackStatus = 'UNKNOWN'
   let lastMessage: string | null = null
   let finished = false
+
+  // Reconstruct the track state by folding the (clock-filtered) log into a small
+  // state machine, then collapse to one status by severity at the end. The old
+  // flat fold only looked at Track-scoped flags, so per-sector yellows — which is
+  // how nearly all yellow/double-yellow flags actually arrive — never showed.
+  let sc: 'none' | 'VSC' | 'SC' = 'none'
+  let red = false
+  let chequered = false
+  let trackYellow: 'none' | 'YELLOW' | 'DOUBLE_YELLOW' = 'none'
+  const sectorFlags = new Map<number, 'YELLOW' | 'DOUBLE_YELLOW'>()
+  let seen = false // any recognised status event — else we stay UNKNOWN
 
   for (const m of sorted) {
     lastMessage = m.message ?? lastMessage
     const msg = (m.message ?? '').toUpperCase()
+    const flag = (m.flag ?? '').toUpperCase()
 
     if (m.category === 'SafetyCar') {
-      if (msg.includes('VIRTUAL')) status = msg.includes('ENDING') ? 'GREEN' : 'VSC'
-      else if (msg.includes('SAFETY CAR'))
-        status = msg.includes('IN THIS LAP') || msg.includes('ENDING') ? 'GREEN' : 'SC'
+      if (msg.includes('VIRTUAL')) {
+        sc = msg.includes('ENDING') ? 'none' : 'VSC'
+        seen = true
+      } else if (msg.includes('SAFETY CAR')) {
+        // "DEPLOYED" raises it; "IN THIS LAP" / "ENDING" stands it down.
+        sc = msg.includes('IN THIS LAP') || msg.includes('ENDING') ? 'none' : 'SC'
+        seen = true
+      }
       continue
     }
-    if (m.category === 'Flag' && (m.scope === 'Track' || !m.scope)) {
-      switch ((m.flag ?? '').toUpperCase()) {
-        case 'GREEN':
-        case 'CLEAR':
-          status = 'GREEN'
-          break
-        case 'YELLOW':
-          if (status === 'GREEN' || status === 'UNKNOWN') status = 'YELLOW'
-          break
-        case 'DOUBLE YELLOW':
-          status = 'DOUBLE_YELLOW'
-          break
-        case 'RED':
-          status = 'RED'
-          break
-        case 'CHEQUERED':
-          status = 'CHEQUERED'
-          finished = true
-          break
+    if (m.category !== 'Flag') continue
+
+    const sector = m.sector
+    switch (flag) {
+      case 'YELLOW':
+      case 'DOUBLE YELLOW': {
+        const level = flag === 'DOUBLE YELLOW' ? 'DOUBLE_YELLOW' : 'YELLOW'
+        if (m.scope === 'Sector' && sector != null) sectorFlags.set(sector, level)
+        else trackYellow = level
+        seen = true
+        break
       }
+      case 'GREEN':
+      case 'CLEAR':
+        if (m.scope === 'Sector' && sector != null) {
+          sectorFlags.delete(sector)
+        } else {
+          // Track-wide green: racing resumes — everything clears.
+          sectorFlags.clear()
+          trackYellow = 'none'
+          red = false
+        }
+        seen = true
+        break
+      case 'RED':
+        red = true
+        seen = true
+        break
+      case 'CHEQUERED':
+        chequered = true
+        finished = true
+        seen = true
+        break
     }
   }
+
+  const anyDoubleYellow = trackYellow === 'DOUBLE_YELLOW' || [...sectorFlags.values()].includes('DOUBLE_YELLOW')
+  const anyYellow = trackYellow !== 'none' || sectorFlags.size > 0
+
+  // Most severe wins. Chequered only shows once the track is otherwise clear.
+  let status: TrackStatus
+  if (!seen) status = 'UNKNOWN'
+  else if (red) status = 'RED'
+  else if (sc === 'SC') status = 'SC'
+  else if (sc === 'VSC') status = 'VSC'
+  else if (anyDoubleYellow) status = 'DOUBLE_YELLOW'
+  else if (anyYellow) status = 'YELLOW'
+  else if (chequered) status = 'CHEQUERED'
+  else status = 'GREEN'
+
   return { status, lastMessage, finished }
 }
 
@@ -605,6 +649,8 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     countryName: raw.session?.country_name ?? '',
     meetingName: raw.meeting?.meeting_name ?? raw.session?.location ?? '',
     year: raw.session?.year ?? null,
+    sessionStart: Number.isFinite(t(raw.session?.date_start)) ? t(raw.session?.date_start) : null,
+    sessionEnd: Number.isFinite(t(raw.session?.date_end)) ? t(raw.session?.date_end) : null,
     status,
     currentLap,
     lastMessage,

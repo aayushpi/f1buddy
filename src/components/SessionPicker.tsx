@@ -30,6 +30,18 @@ function countryFlag(name: string | undefined): string {
   return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
 }
 
+// A Grand Prix weekend runs ~Fri→Sun. With only date_start to go on, treat a
+// meeting as happening "now" for a few days after it opens, future before it,
+// past after — used to emphasise the live weekend and dim what hasn't run yet.
+const WEEKEND_MS = 4 * 24 * 60 * 60 * 1000
+function meetingPhase(m: ApiMeeting, now: number): 'past' | 'current' | 'future' {
+  const start = Date.parse(m.date_start)
+  if (!Number.isFinite(start)) return 'past'
+  if (now < start) return 'future'
+  if (now <= start + WEEKEND_MS) return 'current'
+  return 'past'
+}
+
 function fmtDate(iso: string | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -169,19 +181,26 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
             <div className="picker-note">No Grands Prix found for {year}.</div>
           )}
           <div className="picker-grid">
-            {meetings.map((m) => (
-              <motion.button
-                key={m.meeting_key}
-                className="gp-card"
-                onClick={() => setSelected(m)}
-                whileTap={{ scale: 0.97 }}
-              >
-                <TrackThumb meeting={m} />
-                <span className="gp-country">{m.country_name}</span>
-                <span className="gp-name">{m.meeting_name}</span>
-                <span className="gp-date">{fmtDate(m.date_start)}</span>
-              </motion.button>
-            ))}
+            {meetings.map((m) => {
+              const phase = meetingPhase(m, Date.now())
+              return (
+                <motion.button
+                  key={m.meeting_key}
+                  className={`gp-card ${phase}`}
+                  onClick={() => setSelected(m)}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {phase === 'current' && <span className="gp-now">● This weekend</span>}
+                  <TrackThumb meeting={m} />
+                  <span className="gp-country">
+                    <span className="gp-flag">{countryFlag(m.country_name)}</span>
+                    {m.country_name}
+                  </span>
+                  <span className="gp-name">{m.meeting_name}</span>
+                  <span className="gp-date">{fmtDate(m.date_start)}</span>
+                </motion.button>
+              )
+            })}
           </div>
         </div>
       ) : (

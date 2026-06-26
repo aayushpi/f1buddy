@@ -329,9 +329,23 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
 
           {mode === 'error' && (
             <div className="hero-body">
-              <div className="hero-kicker err">Signal lost</div>
-              <div className="hero-title">Couldn’t reach OpenF1</div>
-              <div className="hero-sub">Check your connection — you can still load a past session below.</div>
+              {cal.liveLocked ? (
+                <>
+                  <div className="hero-kicker err">Live session — locked</div>
+                  <div className="hero-title">OpenF1 is authenticated-only right now</div>
+                  <div className="hero-sub">
+                    A session is live, so OpenF1 restricts all data — even past races — to
+                    authenticated users until it ends. Route the app through the proxy with your
+                    OpenF1 credentials, or check back after the session.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="hero-kicker err">Signal lost</div>
+                  <div className="hero-title">Couldn’t reach OpenF1</div>
+                  <div className="hero-sub">Check your connection — you can still load a past session below.</div>
+                </>
+              )}
             </div>
           )}
         </motion.div>

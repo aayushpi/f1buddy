@@ -10,6 +10,7 @@ import { NoticeStack } from './components/NoticeStack'
 import { LiveEntryChoice } from './components/LiveEntryChoice'
 import { Home } from './components/Home'
 import { useRaceNotices } from './hooks/useRaceNotices'
+import { useKeepAwake } from './hooks/useKeepAwake'
 import { DriverFocus } from './components/DriverFocus'
 import type { AppSettings } from './components/SettingsDrawer'
 import { TrackMap } from './components/views/TrackMap'
@@ -214,35 +215,10 @@ export default function App() {
     }
   }, [lapWindow, selected, activeView, notify, trackAlerts])
 
-  // Keep the screen awake while the app is open — it's meant to sit on an iPad
-  // through a whole session. The browser drops the lock on tab-switch / sleep,
-  // so we re-acquire it whenever the tab returns to the foreground.
-  useEffect(() => {
-    interface WakeLockSentinelLike { release: () => Promise<void> }
-    const nav = navigator as Navigator & {
-      wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> }
-    }
-    if (!nav.wakeLock) return
-    let lock: WakeLockSentinelLike | null = null
-    let cancelled = false
-    const acquire = async () => {
-      try {
-        lock = await nav.wakeLock!.request('screen')
-      } catch {
-        /* needs a user gesture or unsupported — ignore */
-      }
-    }
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && !cancelled) acquire()
-    }
-    acquire()
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisible)
-      lock?.release().catch(() => {})
-    }
-  }, [])
+  // Keep the screen awake while a session is loaded — it's meant to sit on an
+  // iPad through a whole session. Uses nosleep.js (Wake Lock where available,
+  // muted-video fallback on iOS Safari where the Wake Lock API doesn't hold).
+  useKeepAwake(selection != null)
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
@@ -300,6 +276,9 @@ export default function App() {
               drivers={snapshot.drivers}
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
+              endMs={snapshot.race.sessionEnd}
+              nowMs={replay?.tNow ?? null}
+              live={replay?.atLive ?? false}
             />
           </div>
         )
@@ -310,6 +289,9 @@ export default function App() {
               drivers={snapshot.drivers}
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
+              endMs={snapshot.race.sessionEnd}
+              nowMs={replay?.tNow ?? null}
+              live={replay?.atLive ?? false}
             />
           </div>
         )

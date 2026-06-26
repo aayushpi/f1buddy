@@ -378,6 +378,10 @@ export interface RaceState {
   countryName: string
   meetingName: string
   year: number | null
+  // Scheduled session start / end (epoch ms), for the session-clock countdown.
+  // null when the feed carries no usable dates.
+  sessionStart: number | null
+  sessionEnd: number | null
   status: TrackStatus
   currentLap: number | null
   lastMessage: string | null

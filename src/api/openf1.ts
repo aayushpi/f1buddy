@@ -28,6 +28,22 @@ export interface OpenF1Config {
   apiKey?: string // optional bearer token for real-time access
 }
 
+/**
+ * Thrown on a 401/403 from OpenF1. The free historical tier is open *except*
+ * while a session is live: OpenF1 then locks ALL global access (even past data)
+ * to authenticated users until the session ends. That's an auth state, not a
+ * connectivity failure, so callers can message it accurately.
+ */
+export class OpenF1AuthError extends Error {
+  // True when the lock is due to a live session in progress (vs. a bad key).
+  liveLocked: boolean
+  constructor(message: string, liveLocked: boolean) {
+    super(message)
+    this.name = 'OpenF1AuthError'
+    this.liveLocked = liveLocked
+  }
+}
+
 export const defaultConfig: OpenF1Config = {
   baseUrl: DEFAULT_BASE,
 }
@@ -122,6 +138,19 @@ async function get<T>(
           `OpenF1 rate limit (429): too many requests. Wait a few seconds and retry${
             cfg.apiKey ? '' : ', or add an API key in Settings'
           }.`,
+        )
+      }
+      // OpenF1 locks all access (even past data) to authenticated users while a
+      // session is live. Distinguish that from a connectivity problem so the UI
+      // can say so and point at the proxy instead of "check your connection".
+      if (res.status === 401 || res.status === 403) {
+        const detail = await res.text().catch(() => '')
+        const liveLocked = /live/i.test(detail)
+        throw new OpenF1AuthError(
+          liveLocked
+            ? 'OpenF1 is restricted to authenticated users while a session is live (this includes past data). Route the app through the proxy with your OpenF1 credentials, or try again after the session ends.'
+            : `OpenF1 requires authentication (${res.status}). Configure the proxy with your OpenF1 credentials.`,
+          liveLocked,
         )
       }
       if (!res.ok) throw new Error(`OpenF1 ${path} failed: ${res.status} ${res.statusText}`)
