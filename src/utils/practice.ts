@@ -50,9 +50,10 @@ export interface Timesheet {
 export interface RunLap {
   lap: number
   time: number
-  // false ⇒ shown but excluded from the average (out-/in-lap or traffic outlier).
+  // false ⇒ shown but excluded from the average (out-/in-lap, traffic outlier, or
+  // a manual exclude). 'manual' also covers a lap the analyst forced back in.
   counted: boolean
-  reason: 'out' | 'in' | 'outlier' | null
+  reason: 'out' | 'in' | 'outlier' | 'manual' | null
 }
 
 export interface Run {
@@ -283,6 +284,32 @@ function scoreRun(d: DriverState, colour: string, compound: string | null, group
     degPerLap: slope(counted.map((x, i) => ({ x: i, y: x.time }))),
     consistency: times.length >= 2 ? stdev(times) : null,
     isLongRun: false, // set after the adaptive threshold is known
+  }
+}
+
+/**
+ * Recompute a run's stats after the analyst manually flips some laps in or out.
+ * `override` maps a lap number to its forced counted state; laps not in the map
+ * keep their automatic classification. Pure — returns a fresh Run, so the live
+ * report is never mutated.
+ */
+export function recountRun(run: Run, override: Map<number, boolean>): Run {
+  const laps: RunLap[] = run.laps.map((l) => {
+    const forced = override.get(l.lap)
+    if (forced == null || forced === l.counted) return l
+    return { ...l, counted: forced, reason: forced ? null : 'manual' }
+  })
+  const counted = laps.filter((l) => l.counted)
+  const times = counted.map((l) => l.time)
+  return {
+    ...run,
+    laps,
+    countedLaps: counted.length,
+    avg: times.length ? mean(times) : null,
+    median: times.length ? median(times) : null,
+    best: times.length ? Math.min(...times) : null,
+    degPerLap: slope(counted.map((x, i) => ({ x: i, y: x.time }))),
+    consistency: times.length >= 2 ? stdev(times) : null,
   }
 }
 

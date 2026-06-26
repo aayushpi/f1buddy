@@ -1138,6 +1138,27 @@ button {
   background: rgba(228, 182, 86, 0.92); /* warm amber: distinct from cyan racing + slate pre-race */
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6); /* lights-out boundary */
 }
+/* Lap-activity clustermap (practice + qualifying): a row of density bars over
+   the track. Dense running stands tall and bright; the quiet stretches between
+   qualifying segments fall away to almost nothing, so the Q1/Q2/Q3 clusters read
+   without ever printing a lap number. */
+.lap-activity {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  pointer-events: none;
+}
+.la-bar {
+  flex: 1 1 0;
+  min-height: 1px;
+  border-radius: 1px 1px 0 0;
+  background: var(--accent);
+}
 /* "Pre-race" sits at the very left of the same row as the lap numbers. */
 .prerace-label {
   position: absolute;
@@ -1154,6 +1175,24 @@ button {
   transform: translateX(-50%);
   color: #e3c270;
 }
+/* Q1/Q2/Q3 markers: clickable, centred over each qualifying segment window. */
+.quali-seg-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #aeb6cc;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.quali-seg-label:hover { color: var(--accent); }
 .scrub::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px; height: 16px;
@@ -2019,6 +2058,69 @@ button {
   background: rgba(34, 224, 122, 0.12); border: 1px solid var(--green);
 }
 .gp-flag { font-size: 14px; margin-right: 6px; letter-spacing: 0; }
+.gp-lock {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  font-size: 12px; opacity: 0.8;
+}
+
+/* -------------------------------------------------------------------------
+   Paywall — the access gate for recent (latest two weekend) sessions.
+   ------------------------------------------------------------------------- */
+.paywall {
+  position: relative; min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.paywall-card {
+  position: relative; z-index: 1; width: 100%; max-width: 520px;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 28px; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--panel-strong);
+}
+.paywall-kicker {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent);
+}
+.paywall-title { font-size: 28px; font-weight: 800; margin: 0; }
+.paywall-lede { margin: 0; color: var(--text-dim); line-height: 1.5; font-size: 14px; }
+.paywall-options { display: flex; flex-direction: column; gap: 10px; margin: 4px 0; }
+.paywall-opt {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel);
+}
+.paywall-opt-amt { font-size: 18px; font-weight: 800; color: var(--text); }
+.paywall-opt-desc { font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+.paywall-opt-desc a { color: var(--accent); }
+.paywall-or { text-align: center; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.paywall-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.paywall-cta {
+  display: inline-flex; align-items: center; align-self: flex-start; margin-top: 2px;
+  padding: 7px 13px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  color: var(--text); text-decoration: none;
+  border: 1px solid var(--border-strong); background: var(--panel);
+  transition: border-color 0.14s, background 0.14s;
+}
+.paywall-cta:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.08); }
+.paywall-contact { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+.paywall-contact a { color: var(--accent); }
+.paywall-form { display: flex; gap: 8px; margin-top: 4px; }
+.paywall-input {
+  flex: 1 1 auto; min-width: 0; padding: 11px 14px; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--panel); color: var(--text);
+  font-size: 15px;
+}
+.paywall-input::placeholder { color: var(--muted); }
+.paywall-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(25,227,255,0.15); }
+.paywall-go {
+  flex: 0 0 auto; padding: 0 18px; border-radius: 10px; border: none; cursor: pointer;
+  font-weight: 800; color: #04121a; background: linear-gradient(120deg, var(--accent), #59f0ff);
+}
+.paywall-go:disabled { opacity: 0.5; cursor: default; }
+.paywall-err { color: var(--red); font-size: 12px; }
+.paywall-back {
+  align-self: flex-start; margin-top: 4px; background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 13px;
+}
+.paywall-back:hover { color: var(--text); }
 .gp-thumb {
   height: 88px;
   margin-bottom: 10px;
@@ -2235,6 +2337,10 @@ button {
 }
 .pb-item { display: flex; flex-direction: column; gap: 3px; }
 .pb-k { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.q-official {
+  margin-left: 6px; padding: 1px 5px; border-radius: 4px; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.12em; color: var(--bg); background: var(--green); vertical-align: middle;
+}
 .pb-v { font-size: 16px; font-weight: 800; font-family: var(--mono); }
 .pb-v.sb { color: var(--purple); }
 .pb-v.mono { font-size: 13px; color: var(--text-dim); }
@@ -2351,6 +2457,55 @@ button {
 .rd-avg-row .rd-t-lap { color: var(--accent); font-size: 15px; }
 .rd-avg-row .rd-t-time { color: var(--accent); }
 .rd-avg-row .rd-t-note { color: var(--muted); opacity: 1; text-transform: none; }
+
+/* -------------------------------------------------------------------------
+   Long-run comparison: driver toggle chips, then a grouped-by-driver bar
+   chart or a row of per-driver lap tables with the ± include/exclude control.
+   ------------------------------------------------------------------------- */
+.lr > .panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 12px; }
+.lrc-modetoggle { margin-left: 12px; }
+.lrc-modetoggle button { padding: 4px 10px; font-size: 10px; }
+
+.lrc-toggles { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+.lrc-chip { gap: 6px; }
+
+/* Graph: one bar block per driver, side by side on a shared vertical scale. */
+.lrc-chart { position: relative; flex: 1 1 auto; min-height: 160px; }
+.lrc-fastline { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--accent); opacity: 0.5; z-index: 1; }
+.lrc-groups { position: absolute; inset: 0; display: flex; align-items: stretch; gap: 16px; overflow-x: auto; padding-bottom: 2px; }
+.lrc-group { flex: 1 1 0; min-width: 88px; display: flex; flex-direction: column; gap: 6px; }
+.lrc-bars { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 3px; min-height: 0; }
+.lrc-bar {
+  flex: 1 1 0; max-width: 22px; border-radius: 3px 3px 0 0; min-height: 2px; padding: 0;
+  border: none; appearance: none; cursor: pointer; transition: height 0.2s ease, filter 0.15s ease;
+}
+.lrc-bar:hover { filter: brightness(1.25); }
+.lrc-bar.excl { opacity: 0.45; }
+.lrc-bar.excl:hover { opacity: 0.7; }
+.lrc-group-foot { display: flex; align-items: baseline; gap: 8px; border-top: 1px solid var(--border); padding-top: 5px; }
+.lrc-group-acr { font-weight: 800; font-size: 13px; }
+.lrc-group-avg { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.lrc-group-deg { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-left: auto; }
+
+/* Table: side-by-side per-driver lap tables with the ± include/exclude control. */
+.lrc-tables { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; gap: 14px; align-items: flex-start; }
+.lrc-table { flex: 0 0 auto; min-width: 218px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.lrc-table-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel-strong); border-bottom: 1px solid var(--border); }
+.lrc-table-acr { font-weight: 800; font-size: 14px; }
+.lrc-table-stat { font-family: var(--mono); font-size: 12px; }
+.lrc-table-stat.dim { color: var(--muted); margin-left: auto; }
+.lrc-rd-table { font-size: 12px; }
+.lrc-t-act { width: 30px; text-align: center; }
+.lrc-tog {
+  width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--border-strong);
+  background: var(--panel); color: var(--text-dim); font-weight: 800; line-height: 1; cursor: pointer;
+}
+.lrc-tog:hover { background: var(--panel-strong); }
+.lrc-tog.in { color: var(--green); border-color: rgba(57, 211, 83, 0.4); }
+.lrc-tog.out { color: var(--muted); }
+
+.lrc-hint { color: var(--muted); font-style: italic; }
+.rd-legend .dot.on { background: var(--accent); opacity: 1; }
 
 /* -------------------------------------------------------------------------
    Qualifying view (Qualifying sessions only): the knockout grid with the

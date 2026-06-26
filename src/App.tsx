@@ -286,6 +286,7 @@ export default function App() {
               drivers={snapshot.drivers}
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
+              qualifyingResult={snapshot.qualifyingResult}
             />
           </div>
         )
@@ -407,6 +408,7 @@ export default function App() {
           replay={replay}
           currentLap={snapshot?.race.currentLap ?? null}
           sessionEnd={snapshot?.race.sessionEnd ?? null}
+          sessionType={sessionType}
         />
       )}
 

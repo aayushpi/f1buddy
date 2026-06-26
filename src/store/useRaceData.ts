@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpenF1Config } from '../api/openf1'
 import type { ApiCarData, ApiDriver, ApiLocation, ApiSession, ChannelPoint, RaceSnapshot } from '../api/types'
 import {
+  buildLapActivity,
   buildLapMarkers,
+  buildQualifyingSegments,
   buildSnapshot,
   filterRawByTime,
   rawTimeBounds,
+  type QualiSegment,
   type RawData,
 } from '../utils/derive'
 // 'idle' loads nothing (used while the home screen is shown); 'live' loads and
@@ -53,6 +56,12 @@ export interface ReplayControls {
   playing: boolean
   speed: number
   lapMarkers: LapMarker[]
+  // Normalised lap-activity density (0..1 per bin) across [tMin, tMax], for the
+  // scrubber's clustermap on practice / qualifying. Empty for a race.
+  lapActivity: number[]
+  // Q1/Q2/Q3 running windows for a qualifying session (null otherwise), so the
+  // scrubber can label the knockout segments.
+  qualifyingSegments: QualiSegment[] | null
   // Start of the formation/grid window (session start) when it sits before lap 1;
   // null if unknown. Everything tMin..formationStart is pre-race standing time,
   // formationStart..lap1 is the formation lap ("lap 0").
@@ -154,6 +163,7 @@ const emptyRaw = (): RawData => ({
   overtakes: [],
   startingGrid: [],
   results: [],
+  qualifyingResults: [],
 })
 
 const TELEMETRY_VIEWS: ActiveView[] = ['map', 'telemetry']
@@ -179,6 +189,8 @@ export function useRaceData(opts: DataOptions): DataResult {
   const clock = useRef({ tNow: 0, tMin: 0, tMax: 1, raceEnd: 1, playing: true, speed: 6 })
   const dirty = useRef(false) // force a rebuild on the next tick (after a seek)
   const markersRef = useRef<LapMarker[]>([])
+  const lapActivityRef = useRef<number[]>([])
+  const qualiSegmentsRef = useRef<QualiSegment[] | null>(null)
   const formationStartRef = useRef<number | null>(null)
   const follow = useRef(false) // pinned to the live edge ("go live")
   const isLiveRef = useRef(false) // the loaded session is still in progress
@@ -199,6 +211,8 @@ export function useRaceData(opts: DataOptions): DataResult {
       playing: c.playing,
       speed: c.speed,
       lapMarkers: markersRef.current,
+      lapActivity: lapActivityRef.current,
+      qualifyingSegments: qualiSegmentsRef.current,
       formationStart: formationStartRef.current,
       live: isLiveRef.current,
       atLive: follow.current || (isLiveRef.current && c.tNow >= c.tMax - AT_LIVE_MS),
@@ -268,6 +282,25 @@ export function useRaceData(opts: DataOptions): DataResult {
     follow.current = false // default: watch from the beginning
     isLiveRef.current = false
     formationStartRef.current = null
+    qualiSegmentsRef.current = null
+
+    // Scrubber metadata for non-race sessions: the lap-activity clustermap
+    // (practice + qualifying) and the Q1/Q2/Q3 segment labels (qualifying).
+    // Recomputed as the live feed grows; the clustermap is bounded to the
+    // watchable edge so simulated-live can't reveal future activity.
+    const refreshScrubberMeta = () => {
+      const r = rawRef.current
+      const type = (r.session?.session_type ?? '').toLowerCase()
+      const isQuali = type.includes('qual')
+      const isPractice = type.includes('practice')
+      qualiSegmentsRef.current = isQuali ? buildQualifyingSegments(r) : null
+      if (isQuali || isPractice) {
+        const c = clock.current
+        lapActivityRef.current = buildLapActivity(r, c.tMin, c.tMax, c.tMax)
+      } else {
+        lapActivityRef.current = []
+      }
+    }
 
     // Grid/formation starts at the session start, when it sits a sensible gap
     // before lap 1. (No "lap 0" exists in the feed, so we derive it.)
@@ -404,6 +437,7 @@ export function useRaceData(opts: DataOptions): DataResult {
       // feed would otherwise make the scrubber's lap ticks blink out and back.
       const m = buildLapMarkers(r)
       if (m.length || markersRef.current.length === 0) markersRef.current = m
+      refreshScrubberMeta()
       computeFormation()
     }
 
@@ -478,6 +512,7 @@ export function useRaceData(opts: DataOptions): DataResult {
           playing: hasTimeline || isLive,
           speed: isLive ? 1 : 6, // live: watch in real time; past: fast replay
         }
+        refreshScrubberMeta()
         computeFormation()
         syncClock()
         setConnection(isLive ? 'live' : 'replay')

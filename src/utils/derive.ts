@@ -20,6 +20,7 @@ import type {
   GridRow,
   OvertakeEvent,
   PitEvent,
+  QualifyingClassification,
   RaceControlEntry,
   RaceSnapshot,
   RaceState,
@@ -52,6 +53,10 @@ export interface RawData {
   overtakes: ApiOvertake[]
   startingGrid: ApiStartingGrid[]
   results: ApiSessionResult[]
+  // Official qualifying classification, passed through the clock filter ungated
+  // (the final grid is the whole point of the Qualifying view). Derived in
+  // filterRawByTime; empty for non-qualifying sessions.
+  qualifyingResults: ApiSessionResult[]
 }
 
 export const TELEMETRY_TRACE_LEN = 70
@@ -74,6 +79,88 @@ export function indexRawTimes(raw: RawData): void {
   for (const l of raw.laps as ({ date_start: string | null } & Timed)[]) {
     l.__t = l.date_start ? Date.parse(l.date_start) : NaN
   }
+}
+
+// A qualifying knockout segment (Q1/Q2/Q3) as a running time window. The gaps
+// *between* windows are the inter-segment breaks the scrubber shades.
+export interface QualiSegment {
+  seg: 1 | 2 | 3
+  start: number
+  end: number
+}
+
+/**
+ * Locate the Q1/Q2/Q3 windows for a qualifying session (OpenF1 carries no
+ * segment field). Pure lap-gap detection is fooled by red flags and mid-segment
+ * pit cycles, so instead we anchor on the official result: each driver's
+ * session_result duration is their [Q1, Q2, Q3] best-lap times. We match each
+ * back to the lap that set it — in time order per driver, since a car's segments
+ * happen Q1→Q2→Q3, which stops a coincidentally equal lap time elsewhere from
+ * stealing the match — then take each segment's window as the span of those
+ * classified laps. Returns null until the result is known or if the windows
+ * don't come out cleanly ordered (degenerate data).
+ */
+export function buildQualifyingSegments(raw: RawData): QualiSegment[] | null {
+  if (!raw.results.length || raw.laps.length < 12) return null
+
+  // Each driver's timed laps, ascending by start, with the lap time to match on.
+  const byDriver = new Map<number, { start: number; dur: number }[]>()
+  for (const l of raw.laps) {
+    const start = lapT(l)
+    if (!Number.isFinite(start) || l.lap_duration == null || l.lap_duration <= 0) continue
+    const arr = byDriver.get(l.driver_number) ?? []
+    arr.push({ start, dur: l.lap_duration })
+    byDriver.set(l.driver_number, arr)
+  }
+  for (const arr of byDriver.values()) arr.sort((a, b) => a.start - b.start)
+
+  const segStarts: [number[], number[], number[]] = [[], [], []]
+  for (const r of raw.results) {
+    const dur = Array.isArray(r.duration) ? r.duration : []
+    const laps = byDriver.get(r.driver_number) ?? []
+    let after = -Infinity
+    for (let si = 0; si < 3; si++) {
+      const t = dur[si]
+      if (t == null) continue
+      const m = laps.find((l) => l.start > after && Math.abs(l.dur - t) < 0.01)
+      if (m) {
+        segStarts[si].push(m.start)
+        after = m.start
+      }
+    }
+  }
+  if (segStarts.some((s) => s.length === 0)) return null
+
+  const win = (i: 0 | 1 | 2) => ({ start: Math.min(...segStarts[i]), end: Math.max(...segStarts[i]) })
+  const q1 = win(0)
+  const q2 = win(1)
+  const q3 = win(2)
+  if (!(q1.end <= q2.start && q2.end <= q3.start)) return null
+
+  return [
+    { seg: 1, start: q1.start, end: q1.end },
+    { seg: 2, start: q2.start, end: q2.end },
+    { seg: 3, start: q3.start, end: q3.end },
+  ]
+}
+
+// Density of lap activity across the timeline, as `bins` values in 0..1 (peak =
+// 1). Drives the scrubber's "clustermap" — for practice it shows the run pattern,
+// for qualifying the three knockout clusters fall out for free — without ever
+// surfacing a lap number. Only laps up to `tCut` are counted so a simulated-live
+// replay can't reveal activity past the watchable edge.
+export function buildLapActivity(raw: RawData, tMin: number, tMax: number, tCut: number, bins = 120): number[] {
+  const span = tMax - tMin
+  if (!(span > 0)) return []
+  const counts = new Array<number>(bins).fill(0)
+  for (const l of raw.laps) {
+    const s = lapT(l)
+    if (!Number.isFinite(s) || s > tCut) continue
+    const idx = Math.min(bins - 1, Math.max(0, Math.floor(((s - tMin) / span) * bins)))
+    counts[idx]++
+  }
+  const max = Math.max(1, ...counts)
+  return counts.map((c) => c / max)
 }
 
 /** Lap-start times (leader's crossing) for the replay scrubber markers. */
@@ -165,6 +252,12 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
   const stints = raw.stints.filter((s) => s.lap_start <= currentLap)
   const finished = cutoffMs >= raceEndMs - 500
 
+  // The qualifying classification is shown ungated (it's the final grid the
+  // Qualifying view exists to present), so it must not flow through `results` —
+  // a non-empty `results` would flip the session to "finished" and collapse the
+  // replay timeline. Carry it on its own field instead.
+  const isQualifying = (raw.session?.session_type ?? '').toLowerCase().includes('qual')
+
   return {
     session: raw.session,
     meeting: raw.meeting,
@@ -182,6 +275,7 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
     teamRadio: dateLte(raw.teamRadio),
     overtakes: dateLte(raw.overtakes),
     results: finished ? raw.results : [],
+    qualifyingResults: isQualifying ? raw.results : [],
   }
 }
 
@@ -624,6 +718,21 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
       status: r.dsq ? 'DSQ' : r.dns ? 'DNS' : r.dnf ? 'DNF' : 'FIN',
     }))
 
+  // ---- Qualifying classification (official, ungated) ----
+  // session_result.duration is the [Q1, Q2, Q3] best-lap array for a qualifying
+  // session. Carry it verbatim so the view can show the real grid; a single
+  // number (non-qualifying) collapses to a Q1-only entry and simply goes unused.
+  const qualifyingResult: QualifyingClassification[] | null = raw.qualifyingResults.length
+    ? raw.qualifyingResults.map((r) => {
+        const dur = Array.isArray(r.duration) ? r.duration : r.duration != null ? [r.duration] : []
+        return {
+          driverNumber: r.driver_number,
+          position: r.position,
+          segments: [dur[0] ?? null, dur[1] ?? null, dur[2] ?? null],
+        } satisfies QualifyingClassification
+      })
+    : null
+
   // ---- Weather history ----
   const weatherHistory: WeatherPoint[] = raw.weather
     .slice()
@@ -671,6 +780,7 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     raceControlLog,
     grid,
     results,
+    qualifyingResult,
     weatherHistory,
   }
 }

@@ -360,6 +360,17 @@ export interface ResultRow {
   status: 'FIN' | 'DNF' | 'DNS' | 'DSQ'
 }
 
+// The official qualifying classification, straight from session_result. Unlike a
+// recomputed timesheet this is the authoritative FIA order: a driver who reaches
+// a segment but sets no time there is still classified at the back of that group
+// (e.g. into Q3 with no Q3 lap ⇒ P10), which a naive "overall best lap" sort gets
+// wrong. `segments` is each driver's best lap in [Q1, Q2, Q3], null where untimed.
+export interface QualifyingClassification {
+  driverNumber: number
+  position: number | null
+  segments: [number | null, number | null, number | null]
+}
+
 export interface WeatherPoint {
   date: string
   airTemp: number | null
@@ -404,5 +415,10 @@ export interface RaceSnapshot {
   raceControlLog: RaceControlEntry[]
   grid: GridRow[]
   results: ResultRow[]
+  // Official qualifying order (Q1/Q2/Q3 times). Present for a qualifying session
+  // once the result is known; null otherwise. Not gated by the replay clock — it
+  // is the final classification, used to show the real grid instead of a
+  // half-built provisional order.
+  qualifyingResult: QualifyingClassification[] | null
   weatherHistory: WeatherPoint[]
 }

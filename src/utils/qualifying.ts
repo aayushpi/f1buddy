@@ -19,7 +19,7 @@
 // quali-sim, so we reuse buildTimesheet from practice.ts unchanged and layer the
 // knockout + teammate reads on top.
 
-import type { DriverState, StintRow } from '../api/types'
+import type { DriverState, QualifyingClassification, StintRow } from '../api/types'
 import { buildTimesheet, type SectorBests, type TimesheetRow } from './practice'
 
 // Which side of the elimination lines a car currently sits on.
@@ -49,6 +49,9 @@ export interface QualifyingReport {
   rows: QualiRow[]
   sessionBest: SectorBests
   theoreticalBest: number | null
+  // True when the order is the official FIA classification (Q1/Q2/Q3 times),
+  // rather than a provisional best-lap timesheet that evolves with the clock.
+  official: boolean
   pole: { acronym: string; colour: string; time: number } | null
   // The field, and the two elimination lines — all derived from the entry list
   // so a 20-car grid (5 out per cut) and a 22-car grid (6 out per cut) both fall
@@ -72,55 +75,119 @@ function deriveCuts(fieldSize: number): { q3Cut: number; q1Cut: number; eliminat
   return { q3Cut, q1Cut, eliminatedPerSegment }
 }
 
-export function buildQualifying(drivers: DriverState[], stints: StintRow[]): QualifyingReport {
+/** Best (fastest non-null) of a driver's [Q1, Q2, Q3] segment times. */
+function bestSegment(segments: (number | null)[]): number | null {
+  const v = segments.filter((s): s is number => s != null && Number.isFinite(s))
+  return v.length ? Math.min(...v) : null
+}
+
+// A driver's place in the running order, plus the lap that earns it. Built from
+// either the official classification or the provisional timesheet, then enriched
+// with sectors/ideal/trap from the timesheet below.
+interface OrderEntry {
+  driverNumber: number
+  position: number
+  bestLap: number | null
+}
+
+export function buildQualifying(
+  drivers: DriverState[],
+  stints: StintRow[],
+  official?: QualifyingClassification[] | null,
+): QualifyingReport {
   const sheet = buildTimesheet(drivers, stints)
   const teamByNumber = new Map(drivers.map((d) => [d.driverNumber, d.teamName]))
+  const sheetByNumber = new Map(sheet.rows.map((r) => [r.driverNumber, r]))
 
-  const fieldSize = drivers.length
+  const useOfficial = !!official && official.length > 0
+
+  // The running order. Official mode is authoritative: it places a car by its
+  // FIA classification (so a driver into Q3 with no Q3 lap is correctly P10, not
+  // bumped up by a faster earlier-segment lap). Otherwise fall back to the
+  // provisional, clock-evolving best-lap timesheet.
+  let order: OrderEntry[]
+  if (useOfficial) {
+    order = official!
+      .filter((c) => c.position != null)
+      .map((c) => ({ driverNumber: c.driverNumber, position: c.position!, bestLap: bestSegment(c.segments) }))
+      .sort((a, b) => a.position - b.position)
+      // Renumber 1..n so the cut lines line up even if the feed has gaps.
+      .map((e, i) => ({ ...e, position: i + 1 }))
+  } else {
+    order = sheet.rows.map((r) => ({ driverNumber: r.driverNumber, position: r.position, bestLap: r.bestLap }))
+  }
+
+  const fieldSize = order.length
   const { q3Cut, q1Cut, eliminatedPerSegment } = deriveCuts(fieldSize)
 
-  const timeAt = (pos: number): number | null =>
-    sheet.rows.find((r) => r.position === pos)?.bestLap ?? null
+  const bestLapByNumber = new Map(order.map((e) => [e.driverNumber, e.bestLap]))
+  const timeAt = (pos: number): number | null => order.find((e) => e.position === pos)?.bestLap ?? null
   const cut10 = timeAt(q3Cut) // slowest lap still into the pole shootout
   const cut10Next = timeAt(q3Cut + 1) // fastest lap currently outside the top 10
   const cutQ1 = timeAt(q1Cut) // slowest lap still safe from the Q1 cut
 
   const bubble = new Set([q3Cut, q3Cut + 1, q1Cut, q1Cut + 1])
+  const fastest = order.find((e) => e.bestLap != null)?.bestLap ?? null
 
-  // Fastest teammate lap per driver, for the head-to-head.
-  const bestLapByDriver = new Map(sheet.rows.map((r) => [r.driverNumber, r.bestLap]))
+  let prevBest: number | null = null
+  const rows: QualiRow[] = order.map((e) => {
+    const base: TimesheetRow = sheetByNumber.get(e.driverNumber) ?? {
+      driverNumber: e.driverNumber,
+      acronym: drivers.find((d) => d.driverNumber === e.driverNumber)?.acronym ?? String(e.driverNumber),
+      colour: '#8a93a6',
+      position: e.position,
+      bestLap: e.bestLap,
+      gapToBest: null,
+      intervalAhead: null,
+      bestSectors: { s1: null, s2: null, s3: null },
+      idealLap: null,
+      compound: null,
+      speedTrap: null,
+      laps: 0,
+    }
 
-  const rows: QualiRow[] = sheet.rows.map((r) => {
-    const teamName = teamByNumber.get(r.driverNumber) ?? ''
-    const zone: Zone = r.position <= q3Cut ? 'pole' : r.position <= q1Cut ? 'q2' : 'out'
+    const gapToBest = e.bestLap != null && fastest != null ? e.bestLap - fastest : null
+    // Interval to the car ahead. In official mode a car can show a faster best
+    // lap than the car ahead (its quick lap came in an earlier segment it didn't
+    // survive); a negative interval there is misleading, so blank it.
+    let intervalAhead = e.bestLap != null && prevBest != null ? e.bestLap - prevBest : null
+    if (useOfficial && intervalAhead != null && intervalAhead < 0) intervalAhead = null
+    if (e.bestLap != null) prevBest = e.bestLap
+
+    const teamName = teamByNumber.get(e.driverNumber) ?? ''
+    const zone: Zone = e.position <= q3Cut ? 'pole' : e.position <= q1Cut ? 'q2' : 'out'
 
     let toLine: number | null = null
-    if (r.bestLap != null) {
+    if (e.bestLap != null) {
       if (zone === 'out') {
-        toLine = cutQ1 != null ? r.bestLap - cutQ1 : null // deficit to safety (positive)
+        toLine = cutQ1 != null ? e.bestLap - cutQ1 : null // deficit to safety (positive)
       } else if (zone === 'q2') {
-        toLine = cut10 != null ? r.bestLap - cut10 : null // deficit to the top 10 (positive)
+        toLine = cut10 != null ? e.bestLap - cut10 : null // deficit to the top 10 (positive)
       } else {
         // In the shootout: cushion to the first car out (negative ⇒ safe by |x|).
-        toLine = cut10Next != null ? r.bestLap - cut10Next : null
+        toLine = cut10Next != null ? e.bestLap - cut10Next : null
       }
     }
 
     // Fastest teammate (a team can momentarily field >2 cars across a weekend).
     let teammateBest: number | null = null
     for (const [num, team] of teamByNumber) {
-      if (num === r.driverNumber || team !== teamName) continue
-      const bl = bestLapByDriver.get(num) ?? null
+      if (num === e.driverNumber || team !== teamName) continue
+      const bl = bestLapByNumber.get(num) ?? null
       if (bl != null && (teammateBest == null || bl < teammateBest)) teammateBest = bl
     }
-    const teammateDelta = r.bestLap != null && teammateBest != null ? r.bestLap - teammateBest : null
+    const teammateDelta = e.bestLap != null && teammateBest != null ? e.bestLap - teammateBest : null
 
     return {
-      ...r,
+      ...base,
+      position: e.position,
+      bestLap: e.bestLap,
+      gapToBest,
+      intervalAhead,
       teamName,
       zone,
       toLine,
-      onBubble: bubble.has(r.position) && r.bestLap != null,
+      onBubble: bubble.has(e.position) && e.bestLap != null,
       teammateDelta,
       teammateAhead: teammateDelta == null ? null : teammateDelta < 0,
     }
@@ -133,6 +200,7 @@ export function buildQualifying(drivers: DriverState[], stints: StintRow[]): Qua
     rows,
     sessionBest: sheet.sessionBest,
     theoreticalBest: sheet.theoreticalBest,
+    official: useOfficial,
     pole,
     fieldSize,
     q3Cut,

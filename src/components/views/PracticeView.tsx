@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DriverState, StintRow } from '../../api/types'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
-import { buildLongRuns, buildTimesheet, type Run } from '../../utils/practice'
+import { buildLongRuns, buildTimesheet, recountRun, type Run } from '../../utils/practice'
 
 interface Props {
   drivers: DriverState[]
@@ -140,191 +140,285 @@ function QualiSims({ drivers, stints }: { drivers: DriverState[]; stints: StintR
 }
 
 // ---- Long runs ----
+//
+// A comparative read of race-pace runs. Pick drivers with the toggle chips and
+// their best long run is lined up beside the others — grouped *by driver*: each
+// driver owns a block of per-lap bars (graph) or its own lap table. The analyst
+// can flip any lap in or out of the average with the ± control and the pace /
+// degradation / consistency recompute live (recountRun, pure — never mutates the
+// session report).
 
 function LongRuns({ drivers, stints }: { drivers: DriverState[]; stints: StintRow[] }) {
   const report = useMemo(() => buildLongRuns(drivers, stints), [drivers, stints])
-  const longRuns = report.runs.filter((r) => r.isLongRun)
-  const shown = longRuns.length ? longRuns : report.runs.filter((r) => r.countedLaps >= 2)
 
-  const [selected, setSelected] = useState<string | null>(null)
-  const key = (r: Run) => `${r.driverNumber}:${r.laps[0]?.lap ?? 0}`
-  const active = shown.find((r) => key(r) === selected) ?? shown[0] ?? null
+  // One primary run per driver: the longest counted run, ties broken by pace.
+  const runByDriver = useMemo(() => {
+    const m = new Map<number, Run>()
+    for (const r of report.runs) {
+      if (r.countedLaps < 2) continue
+      const cur = m.get(r.driverNumber)
+      const better =
+        !cur ||
+        r.countedLaps > cur.countedLaps ||
+        (r.countedLaps === cur.countedLaps && (r.avg ?? Infinity) < (cur.avg ?? Infinity))
+      if (better) m.set(r.driverNumber, r)
+    }
+    return m
+  }, [report])
+
+  // Drivers available to compare, fastest long-run pace first.
+  const available = useMemo(
+    () => [...runByDriver.values()].sort((a, b) => (a.avg ?? Infinity) - (b.avg ?? Infinity)),
+    [runByDriver],
+  )
+
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [seeded, setSeeded] = useState(false)
+  // Seed once with the four quickest runs, then leave selection to the user.
+  useEffect(() => {
+    if (seeded || available.length === 0) return
+    setSelected(new Set(available.slice(0, 4).map((r) => r.driverNumber)))
+    setSeeded(true)
+  }, [available, seeded])
+
+  const [mode, setMode] = useState<'graph' | 'table'>('graph')
+  // Manual include/exclude overrides, keyed "driverNumber:lap" → forced counted.
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(new Map())
+
+  const toggleDriver = (dn: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(dn)) next.delete(dn)
+      else next.add(dn)
+      return next
+    })
+
+  const setLap = (dn: number, lap: number, counted: boolean) =>
+    setOverrides((prev) => {
+      const next = new Map(prev)
+      next.set(`${dn}:${lap}`, counted)
+      return next
+    })
+
+  // The selected runs with any manual overrides applied and stats recomputed,
+  // re-sorted fastest → slowest on the *current* average so the comparison
+  // reorders live as laps are counted in or out.
+  const runs = useMemo(() => {
+    return available
+      .filter((r) => selected.has(r.driverNumber))
+      .map((r) => {
+        const ov = new Map<number, boolean>()
+        for (const l of r.laps) {
+          const k = `${r.driverNumber}:${l.lap}`
+          if (overrides.has(k)) ov.set(l.lap, overrides.get(k)!)
+        }
+        return ov.size ? recountRun(r, ov) : r
+      })
+      .sort((a, b) => (a.avg ?? Infinity) - (b.avg ?? Infinity))
+  }, [available, selected, overrides])
 
   const fastestAvg = useMemo(() => {
-    const avgs = shown.map((r) => r.avg).filter((a): a is number => a != null)
-    return avgs.length ? Math.min(...avgs) : null
-  }, [shown])
-  const slowestAvg = useMemo(() => {
-    const avgs = shown.map((r) => r.avg).filter((a): a is number => a != null)
-    return avgs.length ? Math.max(...avgs) : null
-  }, [shown])
+    const a = runs.map((r) => r.avg).filter((x): x is number => x != null)
+    return a.length ? Math.min(...a) : null
+  }, [runs])
 
   return (
     <div className="lr">
-      <div className="panel practice-panel lr-list">
+      <div className="panel practice-panel">
         <div className="lr-head">
-          <span className="lr-title">Race-pace ranking</span>
+          <span className="lr-title">Long-run comparison</span>
           <span className="lr-thresh" title="Adapts to this session — rain or red flags shorten runs">
             long run ≥ {report.threshold} laps · longest {report.sessionMaxLen}
           </span>
+          <div className="seg rd-toggle lrc-modetoggle">
+            <button className={mode === 'graph' ? 'active' : ''} onClick={() => setMode('graph')}>
+              Graph
+            </button>
+            <button className={mode === 'table' ? 'active' : ''} onClick={() => setMode('table')}>
+              Table
+            </button>
+          </div>
         </div>
 
-        {shown.length === 0 ? (
-          <div className="practice-empty">No multi-lap runs yet — long-run pace appears once cars string laps together.</div>
-        ) : (
-          <div className="lr-rows">
-            {shown.map((r) => {
-              const span = (slowestAvg ?? 0) - (fastestAvg ?? 0) || 1
-              const pct = r.avg != null ? 30 + (1 - (r.avg - (fastestAvg ?? 0)) / span) * 70 : 0
-              const isBest = r.avg != null && fastestAvg != null && r.avg <= fastestAvg + 5e-4
-              const k = key(r)
-              return (
-                <button
-                  key={k}
-                  className={`lr-row ${active && key(active) === k ? 'on' : ''}`}
-                  onClick={() => setSelected(k)}
-                >
-                  <span className="swatch" style={{ background: r.colour }} />
-                  <span className="lr-acr" style={{ color: r.colour }}>
-                    {r.acronym}
-                  </span>
-                  <span className="tyre-pill sm" style={{ ['--tyre' as string]: compoundColor(r.compound) }}>
-                    {compoundLabel(r.compound)}
-                  </span>
-                  <span className="barwrap">
-                    <span className="barfill" style={{ width: `${pct}%`, background: r.colour }} />
-                  </span>
-                  <span className={`lr-avg ${isBest ? 'best' : ''}`}>Ø {formatLapTime(r.avg)}</span>
-                  <span className="lr-deg" title="Degradation per lap">
-                    {r.degPerLap == null ? '—' : `${r.degPerLap >= 0 ? '+' : '−'}${Math.abs(r.degPerLap).toFixed(2)}/L`}
-                  </span>
-                  <span className="lr-n">{r.countedLaps}L</span>
-                </button>
-              )
-            })}
+        {available.length === 0 ? (
+          <div className="practice-empty">
+            No multi-lap runs yet — long-run pace appears once cars string laps together.
           </div>
+        ) : (
+          <>
+            <div className="lrc-toggles">
+              {available.map((r) => {
+                const on = selected.has(r.driverNumber)
+                return (
+                  <button
+                    key={r.driverNumber}
+                    className={`chip lrc-chip ${on ? 'on' : ''}`}
+                    onClick={() => toggleDriver(r.driverNumber)}
+                  >
+                    <span className="swatch" style={{ background: r.colour }} />
+                    <span style={{ color: on ? r.colour : undefined, fontWeight: 800 }}>{r.acronym}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {runs.length === 0 ? (
+              <div className="practice-empty">Pick a driver above to compare long-run pace.</div>
+            ) : mode === 'graph' ? (
+              <CompareChart runs={runs} fastestAvg={fastestAvg} onToggleLap={setLap} />
+            ) : (
+              <CompareTables runs={runs} onToggleLap={setLap} />
+            )}
+
+            <div className="rd-legend">
+              <span>
+                <i className="dot on" /> counted lap
+              </span>
+              <span>
+                <i className="dot" /> excluded (out / in lap, traffic, or manual)
+              </span>
+              <span className="rd-avgkey">
+                <i className="rd-avgline-key" /> fastest average
+              </span>
+              <span className="lrc-hint">± toggles a lap in or out — pace recomputes</span>
+            </div>
+          </>
         )}
       </div>
-
-      {active && <RunDetail run={active} />}
     </div>
   )
 }
 
-function RunDetail({ run }: { run: Run }) {
-  // Default to the new per-lap table; the bar chart is one toggle away.
-  const [mode, setMode] = useState<'table' | 'graph'>('table')
-
-  return (
-    <div className="panel practice-panel run-detail">
-      <div className="rd-head">
-        <span className="rd-acr" style={{ color: run.colour }}>
-          {run.acronym}
-        </span>
-        <span className="tyre-pill" style={{ ['--tyre' as string]: compoundColor(run.compound) }}>
-          {compoundLabel(run.compound)}
-        </span>
-        <div className="rd-stats">
-          <Stat k="Avg" v={formatLapTime(run.avg)} />
-          <Stat k="Best" v={formatLapTime(run.best)} />
-          <Stat
-            k="Deg"
-            v={run.degPerLap == null ? '—' : `${run.degPerLap >= 0 ? '+' : '−'}${Math.abs(run.degPerLap).toFixed(2)} s/L`}
-          />
-          <Stat k="Consistency" v={run.consistency == null ? '—' : `±${run.consistency.toFixed(2)}s`} />
-          <Stat k="Counted" v={`${run.countedLaps} / ${run.laps.length}`} />
-        </div>
-        <div className="seg rd-toggle">
-          <button className={mode === 'table' ? 'active' : ''} onClick={() => setMode('table')}>
-            Table
-          </button>
-          <button className={mode === 'graph' ? 'active' : ''} onClick={() => setMode('graph')}>
-            Graph
-          </button>
-        </div>
-      </div>
-
-      {mode === 'table' ? <RunTable run={run} /> : <RunChart run={run} />}
-
-      <div className="rd-legend">
-        <span><i className="dot on" style={{ background: compoundColor(run.compound) }} /> counted lap</span>
-        <span><i className="dot" /> excluded (out / in lap or traffic)</span>
-        <span className="rd-avgkey"><i className="rd-avgline-key" /> average pace</span>
-      </div>
-    </div>
-  )
-}
-
-// Per-lap table (default): every lap the driver ran in this run, with the same
-// colour coding as the chart (counted = compound colour, excluded = greyed),
-// and the average pace spelled out in a footer row.
-function RunTable({ run }: { run: Run }) {
-  return (
-    <div className="rd-scroll">
-      <table className="rd-table">
-        <thead>
-          <tr>
-            <th className="rd-t-lap">Lap</th>
-            <th className="rd-t-time">Lap time</th>
-            <th className="rd-t-note">Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {run.laps.map((l) => (
-            <tr key={l.lap} className={l.counted ? '' : 'excl'}>
-              <td className="rd-t-lap">{l.lap}</td>
-              <td className="rd-t-time" style={{ color: l.counted ? compoundColor(run.compound) : undefined }}>
-                {formatLapTime(l.time)}
-              </td>
-              <td className="rd-t-note">{l.counted ? 'counted' : excludeLabel(l)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="rd-avg-row">
-            <td className="rd-t-lap">Ø</td>
-            <td className="rd-t-time">{formatLapTime(run.avg)}</td>
-            <td className="rd-t-note">average over {run.countedLaps} laps</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  )
-}
-
-function RunChart({ run }: { run: Run }) {
-  const lo = Math.min(...run.laps.map((l) => l.time))
-  const hi = Math.max(...run.laps.map((l) => l.time))
-  const pad = Math.max(0.25, (hi - lo) * 0.15)
+// Grouped-by-driver bar chart: every selected driver gets a block of per-lap
+// bars, all on one shared vertical scale so the blocks read comparatively.
+// Clicking a bar counts/discounts that lap, just like the table's ± control.
+function CompareChart({
+  runs,
+  fastestAvg,
+  onToggleLap,
+}: {
+  runs: Run[]
+  fastestAvg: number | null
+  onToggleLap: (dn: number, lap: number, counted: boolean) => void
+}) {
+  // Scale to the counted laps across every driver (the meat of the runs); a slow
+  // excluded lap then clamps to a short stub rather than crushing the axis.
+  const counted = runs.flatMap((r) => r.laps.filter((l) => l.counted).map((l) => l.time))
+  const lo = counted.length ? Math.min(...counted) : 0
+  const hi = counted.length ? Math.max(...counted) : 1
+  const pad = Math.max(0.25, (hi - lo) * 0.18)
   const min = lo - pad
   const max = hi + pad
-  const height = (t: number) => 12 + ((max - t) / (max - min || 1)) * 88
-  const avgY = run.avg != null ? 12 + ((max - run.avg) / (max - min || 1)) * 88 : null
+  const clamp = (v: number) => Math.max(2, Math.min(100, v))
+  const height = (t: number) => clamp(12 + ((max - t) / (max - min || 1)) * 88)
+  const fastestY = fastestAvg != null ? clamp(12 + ((max - fastestAvg) / (max - min || 1)) * 88) : null
 
   return (
-    <div className="rd-chart">
-      {avgY != null && (
-        <>
-          <span className="rd-avgline" style={{ bottom: `${avgY}%` }} />
-          {/* Spell the average pace out just above the dotted line. */}
-          <span className="rd-avglabel" style={{ bottom: `${avgY}%` }}>Ø {formatLapTime(run.avg)}</span>
-        </>
+    <div className="lrc-chart">
+      {fastestY != null && (
+        <span className="lrc-fastline" style={{ bottom: `${fastestY}%` }} title="Fastest average on track" />
       )}
-      <div className="rd-bars">
-        {run.laps.map((l) => (
-          <div key={l.lap} className="rd-col" title={reasonTitle(l)}>
-            <span className="rd-time">{l.counted ? l.time.toFixed(1) : ''}</span>
-            <span
-              className={`rd-bar ${l.counted ? '' : 'excl'}`}
-              style={{
-                height: `${height(l.time)}%`,
-                background: l.counted ? compoundColor(run.compound) : 'rgba(255,255,255,0.12)',
-              }}
-            />
-            <span className="rd-lap">{l.lap}</span>
+      <div className="lrc-groups">
+        {runs.map((run) => (
+          <div key={run.driverNumber} className="lrc-group">
+            <div className="lrc-bars">
+              {run.laps.map((l) => (
+                <button
+                  key={l.lap}
+                  className={`lrc-bar ${l.counted ? '' : 'excl'}`}
+                  style={{
+                    height: `${height(l.time)}%`,
+                    background: l.counted ? compoundColor(run.compound) : 'rgba(255,255,255,0.1)',
+                  }}
+                  title={`${lapTitle(run, l)} — click to ${l.counted ? 'exclude' : 'include'}`}
+                  onClick={() => onToggleLap(run.driverNumber, l.lap, !l.counted)}
+                />
+              ))}
+            </div>
+            <div className="lrc-group-foot">
+              <span className="lrc-group-acr" style={{ color: run.colour }}>
+                {run.acronym}
+              </span>
+              <span className="lrc-group-avg">Ø {formatLapTime(run.avg)}</span>
+              <span className="lrc-group-deg" title="Degradation per lap">
+                {run.degPerLap == null
+                  ? '—'
+                  : `${run.degPerLap >= 0 ? '+' : '−'}${Math.abs(run.degPerLap).toFixed(2)}/L`}
+              </span>
+            </div>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Side-by-side lap tables, one per selected driver, each with a ± control to
+// flip a lap in or out of the driver's average.
+function CompareTables({
+  runs,
+  onToggleLap,
+}: {
+  runs: Run[]
+  onToggleLap: (dn: number, lap: number, counted: boolean) => void
+}) {
+  return (
+    <div className="lrc-tables">
+      {runs.map((run) => (
+        <div key={run.driverNumber} className="lrc-table">
+          <div className="lrc-table-head">
+            <span className="lrc-table-acr" style={{ color: run.colour }}>
+              {run.acronym}
+            </span>
+            <span className="tyre-pill sm" style={{ ['--tyre' as string]: compoundColor(run.compound) }}>
+              {compoundLabel(run.compound)}
+            </span>
+            <span className="lrc-table-stat">Ø {formatLapTime(run.avg)}</span>
+            <span className="lrc-table-stat dim">
+              {run.countedLaps}/{run.laps.length}L
+            </span>
+          </div>
+          <table className="rd-table lrc-rd-table">
+            <thead>
+              <tr>
+                <th className="rd-t-lap">Lap</th>
+                <th className="rd-t-time">Time</th>
+                <th className="rd-t-note">Note</th>
+                <th className="lrc-t-act" />
+              </tr>
+            </thead>
+            <tbody>
+              {run.laps.map((l) => (
+                <tr key={l.lap} className={l.counted ? '' : 'excl'}>
+                  <td className="rd-t-lap">{l.lap}</td>
+                  <td className="rd-t-time" style={{ color: l.counted ? compoundColor(run.compound) : undefined }}>
+                    {formatLapTime(l.time)}
+                  </td>
+                  <td className="rd-t-note">{l.counted ? 'counted' : excludeLabel(l)}</td>
+                  <td className="lrc-t-act">
+                    <button
+                      className={`lrc-tog ${l.counted ? 'out' : 'in'}`}
+                      onClick={() => onToggleLap(run.driverNumber, l.lap, !l.counted)}
+                      title={l.counted ? 'Exclude this lap from the average' : 'Include this lap in the average'}
+                    >
+                      {l.counted ? '−' : '+'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="rd-avg-row">
+                <td className="rd-t-lap">Ø</td>
+                <td className="rd-t-time">{formatLapTime(run.avg)}</td>
+                <td className="rd-t-note" colSpan={2}>
+                  over {run.countedLaps} laps
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ))}
     </div>
   )
 }
@@ -336,19 +430,12 @@ function excludeLabel(l: Run['laps'][number]): string {
       ? 'in-lap'
       : l.reason === 'outlier'
         ? 'traffic / outlier'
-        : 'excluded'
+        : l.reason === 'manual'
+          ? 'excluded'
+          : 'excluded'
 }
 
-function reasonTitle(l: Run['laps'][number]): string {
-  if (l.counted) return `Lap ${l.lap}: ${formatLapTime(l.time)}`
-  return `Lap ${l.lap}: ${formatLapTime(l.time)} — excluded (${excludeLabel(l)})`
-}
-
-function Stat({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="rd-stat">
-      <span className="rd-k">{k}</span>
-      <span className="rd-v">{v}</span>
-    </div>
-  )
+function lapTitle(run: Run, l: Run['laps'][number]): string {
+  const base = `${run.acronym} · lap ${l.lap}: ${formatLapTime(l.time)}`
+  return l.counted ? base : `${base} — excluded (${excludeLabel(l)})`
 }

@@ -6,6 +6,9 @@ interface Props {
   currentLap: number | null
   // Scheduled session end (epoch ms), for the countdown beside the scrubber.
   sessionEnd: number | null
+  // Drives how the scrubber reads: a race shows lap ticks, practice just marks
+  // the start, qualifying marks Q1/Q2/Q3 and shades the breaks between them.
+  sessionType: string
 }
 
 function elapsed(ms: number): string {
@@ -14,16 +17,29 @@ function elapsed(ms: number): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function ReplayBar({ replay, currentLap, sessionEnd }: Props) {
-  const { tMin, tMax, tNow, playing, speed, lapMarkers, live, atLive, formationStart } = replay
+export function ReplayBar({ replay, currentLap, sessionEnd, sessionType }: Props) {
+  const { tMin, tMax, tNow, playing, speed, lapMarkers, lapActivity, live, atLive, formationStart, qualifyingSegments } =
+    replay
   const dur = tMax - tMin || 1
   const pct = ((tNow - tMin) / dur) * 100
   const atEnd = tNow >= tMax - 250
+
+  const type = sessionType.toLowerCase()
+  const isPractice = type.includes('practice')
+  const isQualifying = type.includes('qualifying')
+  // Practice and qualifying don't read by lap number (cars run independent
+  // programmes). Instead of lap ticks they get a lap-activity clustermap; only a
+  // race keeps the numbered lap ticks and navigator.
+  const lapBased = !isPractice && !isQualifying
 
   // Before lap 1 there are two zones we shade distinctly from green-flag racing:
   //   pre-race standing time  [tMin .. formationStart]  — hatched
   //   formation lap ("lap 0") [formationStart .. lap 1] — solid, slightly tinted
   const pctOf = (t: number) => Math.max(0, Math.min(100, ((t - tMin) / dur) * 100))
+
+  // Qualifying: a Q1/Q2/Q3 label centred over each knockout cluster (the breaks
+  // between them read straight off the clustermap's empty stretches).
+  const qSegs = isQualifying ? (qualifyingSegments ?? []) : []
   const raceStartT = lapMarkers.length ? lapMarkers[0].t : tMin
   const hasFormation = formationStart != null && formationStart > tMin && formationStart < raceStartT
   const deadAirEnd = hasFormation ? formationStart! : raceStartT
@@ -59,52 +75,87 @@ export function ReplayBar({ replay, currentLap, sessionEnd }: Props) {
         {playing ? '❚❚' : atEnd ? '↺' : '▶'}
       </button>
 
-      <div className="replay-lapnav">
-        <button onClick={() => jumpToLap(cur - 1)} disabled={cur <= 1} aria-label="Previous lap">
-          ‹
-        </button>
-        <div className="replay-lap">
-          <span className="kicker">Lap</span>
-          <span className="mono val">{lapDisplay}</span>
+      {lapBased && (
+        <div className="replay-lapnav">
+          <button onClick={() => jumpToLap(cur - 1)} disabled={cur <= 1} aria-label="Previous lap">
+            ‹
+          </button>
+          <div className="replay-lap">
+            <span className="kicker">Lap</span>
+            <span className="mono val">{lapDisplay}</span>
+          </div>
+          <button onClick={() => jumpToLap(cur + 1)} aria-label="Next lap">
+            ›
+          </button>
         </div>
-        <button onClick={() => jumpToLap(cur + 1)} aria-label="Next lap">
-          ›
-        </button>
-      </div>
+      )}
 
       <div className="replay-scrub">
         <SessionClock endMs={sessionEnd} nowMs={tNow} />
         <div className="scrub-wrap">
           <div className="lap-ticks">
-            {showPreLabel && (
+            {isPractice && (
+              <span className="prerace-label" style={{ left: 0 }}>
+                Start of session
+              </span>
+            )}
+            {isQualifying &&
+              qSegs.map((s) => {
+                const mid = (pctOf(s.start) + pctOf(s.end)) / 2
+                return (
+                  <button
+                    key={s.seg}
+                    className="quali-seg-label"
+                    style={{ left: `${mid}%` }}
+                    title={`Jump to the start of Q${s.seg}`}
+                    onClick={() => replay.seek(s.start)}
+                  >
+                    Q{s.seg}
+                  </button>
+                )
+              })}
+            {lapBased && showPreLabel && (
               <span className="prerace-label" style={{ left: 0 }}>
                 Pre-race
               </span>
             )}
-            {showZeroLabel && (
+            {lapBased && showZeroLabel && (
               <span className="prerace-label formation" style={{ left: `${(prePct + formEndPct) / 2}%` }}>
                 0
               </span>
             )}
-            {lapMarkers.map((m) => {
-              const left = ((m.t - tMin) / dur) * 100
-              if (left < 0 || left > 100) return null
-              const major = m.lap % majorEvery === 0 || m.lap === 1
-              return (
-                <button
-                  key={m.lap}
-                  className={`lap-tick ${major ? 'major' : ''} ${m.lap === cur ? 'now' : ''}`}
-                  style={{ left: `${left}%` }}
-                  title={`Jump to lap ${m.lap}`}
-                  onClick={() => replay.seek(m.t)}
-                >
-                  {major && <span className="lap-num">{m.lap}</span>}
-                </button>
-              )
-            })}
+            {lapBased &&
+              lapMarkers.map((m) => {
+                const left = ((m.t - tMin) / dur) * 100
+                if (left < 0 || left > 100) return null
+                const major = m.lap % majorEvery === 0 || m.lap === 1
+                return (
+                  <button
+                    key={m.lap}
+                    className={`lap-tick ${major ? 'major' : ''} ${m.lap === cur ? 'now' : ''}`}
+                    style={{ left: `${left}%` }}
+                    title={`Jump to lap ${m.lap}`}
+                    onClick={() => replay.seek(m.t)}
+                  >
+                    {major && <span className="lap-num">{m.lap}</span>}
+                  </button>
+                )
+              })}
           </div>
-          {showPreBand && <div className="prerace-band" style={{ width: `${prePct}%` }} />}
-          {showFormBand && (
+          {/* Practice / qualifying: a lap-activity clustermap instead of ticks. */}
+          {!lapBased && lapActivity.length > 0 && (
+            <div className="lap-activity">
+              {lapActivity.map((v, i) => (
+                <span
+                  key={i}
+                  className="la-bar"
+                  style={{ height: `${Math.max(8, v * 100)}%`, opacity: 0.2 + v * 0.8 }}
+                />
+              ))}
+            </div>
+          )}
+          {lapBased && showPreBand && <div className="prerace-band" style={{ width: `${prePct}%` }} />}
+          {lapBased && showFormBand && (
             <div
               className="formation-band"
               style={{ left: `${prePct}%`, width: `${formEndPct - prePct}%` }}
