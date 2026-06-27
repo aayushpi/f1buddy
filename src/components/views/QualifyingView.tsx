@@ -50,7 +50,7 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
       </div>
 
       {sub === 'mini' ? (
-        <MiniSectors drivers={drivers} />
+        <MiniSectors drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       ) : sub === 'knockout' ? (
         <Knockout drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       ) : (
@@ -80,10 +80,27 @@ function miniColour(code: number): string {
   }
 }
 
-function MiniSectors({ drivers }: { drivers: DriverState[] }) {
-  const rows = useMemo(() => buildMiniSectorRows(drivers), [drivers])
-  const fastest = rows.find((r) => r.bestLap != null)?.bestLap ?? null
-  const hasData = rows.some((r) => r.s1.length || r.s2.length || r.s3.length)
+function MiniSectors({
+  drivers,
+  stints,
+  official,
+  segments,
+}: {
+  drivers: DriverState[]
+  stints: StintRow[]
+  official: QualifyingClassification[] | null
+  segments: QualiSegment[] | null
+}) {
+  // Order strictly by the same classification the other tabs use (official when
+  // known, otherwise the provisional knockout), so the mini-sector list never
+  // diverges from the grid. The strips are looked up per driver.
+  const report = useMemo(
+    () => buildQualifying(drivers, stints, official, segments),
+    [drivers, stints, official, segments],
+  )
+  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers).map((r) => [r.driverNumber, r])), [drivers])
+  const fastest = report.rows.find((r) => r.bestLap != null)?.bestLap ?? null
+  const hasData = [...strips.values()].some((r) => r.s1.length || r.s2.length || r.s3.length)
 
   return (
     <div className="panel practice-panel q-mini">
@@ -95,16 +112,17 @@ function MiniSectors({ drivers }: { drivers: DriverState[] }) {
       </div>
 
       <div className="qm-scroll">
-        {rows.map((r, i) => {
+        {report.rows.map((r) => {
+          const strip = strips.get(r.driverNumber)
           const gap = r.bestLap != null && fastest != null ? r.bestLap - fastest : null
           return (
             <div key={r.driverNumber} className={`qm-row ${r.bestLap == null ? 'qm-empty' : ''}`}>
-              <span className="qm-pos">{r.bestLap != null ? i + 1 : '—'}</span>
+              <span className="qm-pos">{r.bestLap != null ? r.position : '—'}</span>
               <span className="qm-drv" style={{ color: r.colour }}>{r.acronym}</span>
               <span className="qm-lap">{formatLapTime(r.bestLap)}</span>
-              <span className="qm-gap">{i === 0 || gap == null ? '' : formatDelta(gap)}</span>
+              <span className="qm-gap">{r.position === 1 || gap == null ? '' : formatDelta(gap)}</span>
               <span className="qm-strip">
-                {[r.s1, r.s2, r.s3].map((seg, si) => (
+                {[strip?.s1 ?? [], strip?.s2 ?? [], strip?.s3 ?? []].map((seg, si) => (
                   <span key={si} className="qm-seg">
                     {seg.map((code, ci) => (
                       <i key={ci} className="qm-cell" style={{ background: miniColour(code) }} />
