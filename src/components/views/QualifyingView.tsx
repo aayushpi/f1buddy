@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import type { DriverState, QualifyingClassification, StintRow } from '../../api/types'
+import type { QualiSegment } from '../../utils/derive'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
 import { buildQualifying, teammatePairs, type QualiRow, type Zone } from '../../utils/qualifying'
 
@@ -7,9 +8,13 @@ interface Props {
   drivers: DriverState[]
   stints: StintRow[]
   sessionName: string
-  // Official FIA classification (Q1/Q2/Q3 times) once known; when present the
-  // grid is the real final order rather than a clock-evolving timesheet.
+  // Official FIA classification (Q1/Q2/Q3 times), present only once the session
+  // has finished playing out; before then the grid builds up provisionally.
   qualifyingResult: QualifyingClassification[] | null
+  // Q1/Q2/Q3 time windows, so the provisional order can respect the knockout
+  // structure (a car into a segment with no time there isn't promoted by an
+  // earlier-segment lap).
+  qualifyingSegments: QualiSegment[] | null
 }
 
 type Sub = 'knockout' | 'sectors'
@@ -22,7 +27,7 @@ type Sub = 'knockout' | 'sectors'
  *     table) and the intra-team qualifying head-to-head.
  * Shown only for Qualifying sessions (gated by the caller).
  */
-export function QualifyingView({ drivers, stints, sessionName, qualifyingResult }: Props) {
+export function QualifyingView({ drivers, stints, sessionName, qualifyingResult, qualifyingSegments }: Props) {
   const [sub, setSub] = useState<Sub>('knockout')
 
   return (
@@ -40,9 +45,9 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult 
       </div>
 
       {sub === 'knockout' ? (
-        <Knockout drivers={drivers} stints={stints} official={qualifyingResult} />
+        <Knockout drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       ) : (
-        <Sectors drivers={drivers} stints={stints} official={qualifyingResult} />
+        <Sectors drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       )}
     </div>
   )
@@ -60,12 +65,17 @@ function Knockout({
   drivers,
   stints,
   official,
+  segments,
 }: {
   drivers: DriverState[]
   stints: StintRow[]
   official: QualifyingClassification[] | null
+  segments: QualiSegment[] | null
 }) {
-  const report = useMemo(() => buildQualifying(drivers, stints, official), [drivers, stints, official])
+  const report = useMemo(
+    () => buildQualifying(drivers, stints, official, segments),
+    [drivers, stints, official, segments],
+  )
   const hasLap = report.rows.some((r) => r.bestLap != null)
 
   // The two cars on each bubble, for the banner battle lines.
@@ -218,12 +228,17 @@ function Sectors({
   drivers,
   stints,
   official,
+  segments,
 }: {
   drivers: DriverState[]
   stints: StintRow[]
   official: QualifyingClassification[] | null
+  segments: QualiSegment[] | null
 }) {
-  const report = useMemo(() => buildQualifying(drivers, stints, official), [drivers, stints, official])
+  const report = useMemo(
+    () => buildQualifying(drivers, stints, official, segments),
+    [drivers, stints, official, segments],
+  )
   const pairs = useMemo(() => teammatePairs(report), [report])
 
   // Sector kings: the driver who owns each session-best sector.

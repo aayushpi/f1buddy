@@ -208,6 +208,9 @@ export interface LapDetail {
   s2: number | null
   s3: number | null
   pitOut: boolean
+  // Epoch ms the lap started (null if the feed has no start time). Lets the
+  // qualifying view bucket each lap into its Q1/Q2/Q3 window.
+  date: number | null
 }
 
 export interface DriverState {
@@ -415,10 +418,10 @@ export interface RaceSnapshot {
   raceControlLog: RaceControlEntry[]
   grid: GridRow[]
   results: ResultRow[]
-  // Official qualifying order (Q1/Q2/Q3 times). Present for a qualifying session
-  // once the result is known; null otherwise. Not gated by the replay clock — it
-  // is the final classification, used to show the real grid instead of a
-  // half-built provisional order.
+  // Official qualifying order (Q1/Q2/Q3 times), present only once the replay
+  // clock reaches the end of a qualifying session; null while it is still
+  // playing out (the view then shows the provisional, evolving order). Lets the
+  // final grid land exactly on the FIA result without spoiling the session.
   qualifyingResult: QualifyingClassification[] | null
   weatherHistory: WeatherPoint[]
 }

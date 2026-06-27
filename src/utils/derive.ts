@@ -53,9 +53,9 @@ export interface RawData {
   overtakes: ApiOvertake[]
   startingGrid: ApiStartingGrid[]
   results: ApiSessionResult[]
-  // Official qualifying classification, passed through the clock filter ungated
-  // (the final grid is the whole point of the Qualifying view). Derived in
-  // filterRawByTime; empty for non-qualifying sessions.
+  // Official qualifying classification, revealed only once the replay clock has
+  // reached the end of the session (so the grid plays out provisionally before
+  // snapping to the final order). Derived in filterRawByTime; empty otherwise.
   qualifyingResults: ApiSessionResult[]
 }
 
@@ -252,10 +252,11 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
   const stints = raw.stints.filter((s) => s.lap_start <= currentLap)
   const finished = cutoffMs >= raceEndMs - 500
 
-  // The qualifying classification is shown ungated (it's the final grid the
-  // Qualifying view exists to present), so it must not flow through `results` —
-  // a non-empty `results` would flip the session to "finished" and collapse the
-  // replay timeline. Carry it on its own field instead.
+  // The qualifying classification only appears once the replay clock reaches the
+  // end of the session — until then the grid builds up provisionally, lap by
+  // lap, the same way it did live. (It rides its own field rather than `results`
+  // because it carries the Q1/Q2/Q3 segment times, and so it can't flip the
+  // session to "finished" early via `race.finished`.)
   const isQualifying = (raw.session?.session_type ?? '').toLowerCase().includes('qual')
 
   return {
@@ -275,7 +276,7 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
     teamRadio: dateLte(raw.teamRadio),
     overtakes: dateLte(raw.overtakes),
     results: finished ? raw.results : [],
-    qualifyingResults: isQualifying ? raw.results : [],
+    qualifyingResults: isQualifying && finished ? raw.results : [],
   }
 }
 
@@ -472,14 +473,18 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     const lapHistory = allLaps
       .slice()
       .sort((a, b) => a.lap_number - b.lap_number)
-      .map((l) => ({
-        lap: l.lap_number,
-        time: l.lap_duration,
-        s1: l.duration_sector_1,
-        s2: l.duration_sector_2,
-        s3: l.duration_sector_3,
-        pitOut: l.is_pit_out_lap,
-      }))
+      .map((l) => {
+        const d = lapT(l)
+        return {
+          lap: l.lap_number,
+          time: l.lap_duration,
+          s1: l.duration_sector_1,
+          s2: l.duration_sector_2,
+          s3: l.duration_sector_3,
+          pitOut: l.is_pit_out_lap,
+          date: Number.isFinite(d) ? d : null,
+        }
+      })
     const avgLapTime = lapTimes.length
       ? lapTimes.reduce((acc, p) => acc + p.time, 0) / lapTimes.length
       : null

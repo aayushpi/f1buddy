@@ -287,6 +287,7 @@ export default function App() {
               stints={snapshot.stints}
               sessionName={snapshot.race.sessionName}
               qualifyingResult={snapshot.qualifyingResult}
+              qualifyingSegments={replay?.qualifyingSegments ?? null}
             />
           </div>
         )

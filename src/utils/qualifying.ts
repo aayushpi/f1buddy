@@ -20,6 +20,7 @@
 // knockout + teammate reads on top.
 
 import type { DriverState, QualifyingClassification, StintRow } from '../api/types'
+import type { QualiSegment } from './derive'
 import { buildTimesheet, type SectorBests, type TimesheetRow } from './practice'
 
 // Which side of the elimination lines a car currently sits on.
@@ -81,9 +82,82 @@ function bestSegment(segments: (number | null)[]): number | null {
   return v.length ? Math.min(...v) : null
 }
 
+type Seg3 = [number | null, number | null, number | null]
+
+/**
+ * A driver's best timed lap within Q1 / Q2 / Q3 from the laps revealed so far.
+ * Each lap belongs to the latest segment whose start time it's past (s2/s3 are
+ * the Q2/Q3 start times), so the split evolves with the replay clock.
+ */
+function bestPerSegment(d: DriverState, s2: number, s3: number): Seg3 {
+  const best: Seg3 = [null, null, null]
+  for (const l of d.lapHistory) {
+    if (l.time == null || !Number.isFinite(l.time) || l.date == null) continue
+    const i = l.date >= s3 ? 2 : l.date >= s2 ? 1 : 0
+    if (best[i] == null || l.time < best[i]!) best[i] = l.time
+  }
+  return best
+}
+
+/**
+ * Provisional knockout order from the laps revealed so far — how a live timing
+ * screen restructures the grid. Once Q1 running ends, its slowest cars lock to
+ * the bottom on their Q1 time and the survivors re-rank on Q2; likewise into Q3.
+ * Critically a car that reaches a segment but sets no time there sinks to the
+ * back of that segment's group instead of being promoted by a quicker
+ * earlier-segment lap — so a driver into Q3 with no Q3 lap is classified last of
+ * the top ten (P10), not bumped up by a faster Q2 time.
+ */
+function provisionalKnockout(
+  drivers: DriverState[],
+  segments: QualiSegment[],
+  q1Advance: number,
+  q3Group: number,
+): { driverNumber: number; bestLap: number | null }[] {
+  const s2 = segments[1].start
+  const s3 = segments[2].start
+  const seg = new Map(drivers.map((d) => [d.driverNumber, bestPerSegment(d, s2, s3)]))
+  const overall = new Map(drivers.map((d) => [d.driverNumber, bestSegment(seg.get(d.driverNumber)!)]))
+
+  // Which segments have begun in the revealed data (so the cuts only lock in
+  // once their running has actually started under the replay clock).
+  let maxDate = -Infinity
+  for (const d of drivers) for (const l of d.lapHistory) if (l.date != null && l.date > maxDate) maxDate = l.date
+  const q1Done = maxDate >= s2
+  const q2Done = maxDate >= s3
+
+  const bySeg = (nums: number[], i: 0 | 1 | 2) =>
+    nums.slice().sort((a, b) => {
+      const ta = seg.get(a)![i]
+      const tb = seg.get(b)![i]
+      if (ta == null) return tb == null ? 0 : 1
+      if (tb == null) return -1
+      return ta - tb
+    })
+
+  const all = drivers.map((d) => d.driverNumber)
+  let ordered: number[]
+  if (!q1Done) {
+    ordered = bySeg(all, 0)
+  } else {
+    const byQ1 = bySeg(all, 0)
+    const advancers = byQ1.slice(0, q1Advance)
+    const q1Out = byQ1.slice(q1Advance)
+    if (!q2Done) {
+      ordered = [...bySeg(advancers, 1), ...q1Out]
+    } else {
+      const byQ2 = bySeg(advancers, 1)
+      const q3 = byQ2.slice(0, q3Group)
+      const q2Out = byQ2.slice(q3Group)
+      ordered = [...bySeg(q3, 2), ...q2Out, ...q1Out]
+    }
+  }
+  return ordered.map((dn) => ({ driverNumber: dn, bestLap: overall.get(dn) ?? null }))
+}
+
 // A driver's place in the running order, plus the lap that earns it. Built from
-// either the official classification or the provisional timesheet, then enriched
-// with sectors/ideal/trap from the timesheet below.
+// the official classification, the provisional knockout, or a plain best-lap
+// timesheet, then enriched with sectors/ideal/trap from the timesheet below.
 interface OrderEntry {
   driverNumber: number
   position: number
@@ -94,17 +168,22 @@ export function buildQualifying(
   drivers: DriverState[],
   stints: StintRow[],
   official?: QualifyingClassification[] | null,
+  segments?: QualiSegment[] | null,
 ): QualifyingReport {
   const sheet = buildTimesheet(drivers, stints)
   const teamByNumber = new Map(drivers.map((d) => [d.driverNumber, d.teamName]))
   const sheetByNumber = new Map(sheet.rows.map((r) => [r.driverNumber, r]))
 
   const useOfficial = !!official && official.length > 0
+  const useKnockout = !useOfficial && !!segments && segments.length === 3
+  // Both authoritative orders can place a car ahead of one with a slower shown
+  // best lap (their quick lap came in a segment they didn't survive), so a
+  // negative interval to the car ahead is meaningless and gets blanked below.
+  const knockoutOrdered = useOfficial || useKnockout
 
-  // The running order. Official mode is authoritative: it places a car by its
-  // FIA classification (so a driver into Q3 with no Q3 lap is correctly P10, not
-  // bumped up by a faster earlier-segment lap). Otherwise fall back to the
-  // provisional, clock-evolving best-lap timesheet.
+  // The running order. Official mode is the final FIA classification; before the
+  // session ends the provisional knockout mirrors it lap by lap; failing both
+  // (no segment data) we fall back to a plain best-lap timesheet.
   let order: OrderEntry[]
   if (useOfficial) {
     order = official!
@@ -113,6 +192,13 @@ export function buildQualifying(
       .sort((a, b) => a.position - b.position)
       // Renumber 1..n so the cut lines line up even if the feed has gaps.
       .map((e, i) => ({ ...e, position: i + 1 }))
+  } else if (useKnockout) {
+    const cuts = deriveCuts(drivers.length)
+    order = provisionalKnockout(drivers, segments!, cuts.q1Cut, cuts.q3Cut).map((e, i) => ({
+      driverNumber: e.driverNumber,
+      position: i + 1,
+      bestLap: e.bestLap,
+    }))
   } else {
     order = sheet.rows.map((r) => ({ driverNumber: r.driverNumber, position: r.position, bestLap: r.bestLap }))
   }
@@ -147,11 +233,11 @@ export function buildQualifying(
     }
 
     const gapToBest = e.bestLap != null && fastest != null ? e.bestLap - fastest : null
-    // Interval to the car ahead. In official mode a car can show a faster best
-    // lap than the car ahead (its quick lap came in an earlier segment it didn't
-    // survive); a negative interval there is misleading, so blank it.
+    // Interval to the car ahead. In a knockout order a car can show a faster
+    // best lap than the car ahead (its quick lap came in an earlier segment it
+    // didn't survive); a negative interval there is misleading, so blank it.
     let intervalAhead = e.bestLap != null && prevBest != null ? e.bestLap - prevBest : null
-    if (useOfficial && intervalAhead != null && intervalAhead < 0) intervalAhead = null
+    if (knockoutOrdered && intervalAhead != null && intervalAhead < 0) intervalAhead = null
     if (e.bestLap != null) prevBest = e.bestLap
 
     const teamName = teamByNumber.get(e.driverNumber) ?? ''
