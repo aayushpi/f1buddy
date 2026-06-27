@@ -62,17 +62,18 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
 
 // ---- Mini-sector strip ----
 
-// OpenF1's marshalling-segment status codes → colour. Best-effort mapping
-// (purple = overall fastest there, green = the driver's own pace, pit/empty
-// greyed); pending a live cross-check of the exact code legend.
+// OpenF1's marshalling-segment status codes → colour, matching the live-timing
+// legend: purple = overall fastest mini-sector, green = the driver's personal
+// best, yellow = on track but off those, pit/empty greyed.
 function miniColour(code: number): string {
   switch (code) {
     case 2051:
     case 2052:
-      return 'var(--purple)'
-    case 2049:
+      return 'var(--purple)' // overall (session) best
     case 2050:
-      return 'var(--green)'
+      return 'var(--green)' // personal best
+    case 2049:
+      return '#ffce3a' // yellow: timed, not a best
     case 2064:
       return 'rgba(120, 134, 153, 0.45)' // pit lane
     default:
@@ -105,8 +106,9 @@ function MiniSectors({
   return (
     <div className="panel practice-panel q-mini">
       <div className="qm-legend">
-        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> fastest here</span>
-        <span><i className="qm-key" style={{ background: 'var(--green)' }} /> on pace</span>
+        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> fastest overall</span>
+        <span><i className="qm-key" style={{ background: 'var(--green)' }} /> personal best</span>
+        <span><i className="qm-key" style={{ background: '#ffce3a' }} /> on track</span>
         <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
         <span className="qm-note">Mini-sector colours from the timing feed — where the lap was won, not split times.</span>
       </div>
