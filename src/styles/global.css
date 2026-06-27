@@ -2092,6 +2092,18 @@ button {
 .paywall-opt-desc a { color: var(--accent); }
 .paywall-or { text-align: center; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 .paywall-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.paywall-logos { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; margin-top: 6px; }
+.paywall-logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--panel);
+  transition: border-color 0.14s, background 0.14s;
+}
+.paywall-logo:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.08); }
+.paywall-logo img { height: 30px; width: auto; max-width: 180px; object-fit: contain; display: block; }
+/* The MECA mark is full-colour on white, so it gets a light chip to read on the dark card. */
+.paywall-logo.light { background: #fff; }
+.paywall-logo.light:hover { background: #fff; }
 .paywall-cta {
   display: inline-flex; align-items: center; align-self: flex-start; margin-top: 2px;
   padding: 7px 13px; border-radius: 8px; font-size: 13px; font-weight: 700;

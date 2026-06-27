@@ -16,9 +16,9 @@ const MECA_URL = 'https://secure.everyaction.com/X61pOYGcOUiGoTfHn7p1uQ2'
 
 /**
  * The access gate shown when someone opens a recent session (the latest two race
- * weekends) without a current unlock. Anything older stays free. Two ways in:
- * pay ≥ $3/month, or donate $30 to Trans Lifeline or MECA and email the receipt
- * — either way a one-off access key comes back, entered here.
+ * weekends) without a current unlock. Two ways in: donate $30 to Trans Lifeline
+ * or the Middle East Children's Alliance, or chip in on Ko-fi — email proof
+ * either way and a one-off access key comes back, entered here.
  */
 export function Paywall({ onUnlock, onCancel }: Props) {
   const [key, setKey] = useState('')
@@ -36,33 +36,45 @@ export function Paywall({ onUnlock, onCancel }: Props) {
     <div className="paywall">
       <div className="home-grid" />
       <div className="paywall-card">
-        <div className="paywall-kicker">Members only · recent sessions</div>
         <h1 className="paywall-title">Two ways in</h1>
         <p className="paywall-lede">
-          Live timing for the latest two race weekends is for supporters. Everything older —
-          every Grand Prix back to 2023 — stays free.
+          Live timing for the latest two race weekends is for supporters. Historical sessions are
+          still free.
         </p>
 
         <div className="paywall-options">
           <div className="paywall-opt">
-            <span className="paywall-opt-amt">$3+/month</span>
-            <span className="paywall-opt-desc">Chip in monthly on Ko-fi — card, Apple Pay or PayPal.</span>
-            <a className="paywall-cta" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
-              Support on Ko-fi →
-            </a>
-          </div>
-          <div className="paywall-or">or</div>
-          <div className="paywall-opt">
             <span className="paywall-opt-amt">$30 donation</span>
             <span className="paywall-opt-desc">Donate to either, then send me the receipt:</span>
-            <div className="paywall-links">
-              <a className="paywall-cta" href={TRANS_LIFELINE_URL} target="_blank" rel="noopener noreferrer">
-                Trans Lifeline →
+            <div className="paywall-logos">
+              <a
+                className="paywall-logo"
+                href={TRANS_LIFELINE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Donate to Trans Lifeline"
+              >
+                <img src="/logos/trans-lifeline.png" alt="Trans Lifeline" />
               </a>
-              <a className="paywall-cta" href={MECA_URL} target="_blank" rel="noopener noreferrer">
-                MECA →
+              <a
+                className="paywall-logo light"
+                href={MECA_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Donate to the Middle East Children's Alliance"
+              >
+                <img src="/logos/meca.jpg" alt="Middle East Children's Alliance" />
               </a>
             </div>
+          </div>
+
+          <div className="paywall-or">or</div>
+
+          <div className="paywall-opt">
+            <span className="paywall-opt-amt">$3+/month</span>
+            <a className="paywall-cta" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
+              Support me on Ko-fi →
+            </a>
           </div>
         </div>
 
@@ -79,7 +91,7 @@ export function Paywall({ onUnlock, onCancel }: Props) {
               setKey(e.target.value)
               if (status === 'bad') setStatus('idle')
             }}
-            placeholder="e.g. must be the water"
+            placeholder="Enter your access key here"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
