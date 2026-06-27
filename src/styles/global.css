@@ -2540,6 +2540,10 @@ button {
 
 .q-table .q-row.q-out td { color: var(--text-dim); }
 .q-table .q-row.q-out .ts-num.strong { color: var(--text-dim); }
+/* Knocked-out tiers (only once their cut is settled): faded, with the driver's
+   name struck through so the survivors stand out. */
+.q-table .q-row.q-elim { opacity: 0.5; }
+.q-table .q-row.q-elim .ts-drv-inner span:last-child { text-decoration: line-through; }
 /* Tint the left edge of each row by zone so the grid reads at a glance. */
 .q-table .q-row td:first-child { border-left: 3px solid transparent; }
 .q-table .q-row.q-pole td:first-child { border-left-color: var(--green); }
@@ -2547,6 +2551,26 @@ button {
 .q-table .q-row.q-out td:first-child { border-left-color: var(--red); }
 .q-table .q-row.q-bubble { background: rgba(255, 210, 63, 0.07); }
 .q-table .q-row.q-bubble:hover { background: rgba(255, 210, 63, 0.12); }
+
+/* Mini-sector strip: per-driver best lap as coloured marshalling segments. */
+.q-mini { display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 12px; }
+.qm-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; flex: 0 0 auto;
+  font-size: 10px; color: var(--muted);
+}
+.qm-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.qm-key { width: 12px; height: 10px; border-radius: 2px; }
+.qm-note { color: var(--muted); font-style: italic; }
+.qm-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.qm-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.qm-row.qm-empty { opacity: 0.4; }
+.qm-pos { width: 20px; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.qm-drv { width: 44px; font-weight: 800; font-size: 13px; }
+.qm-lap { width: 78px; font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.qm-gap { width: 60px; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.qm-strip { flex: 1 1 auto; display: flex; gap: 6px; min-width: 0; }
+.qm-seg { flex: 1 1 0; display: flex; gap: 1px; }
+.qm-cell { flex: 1 1 0; height: 16px; border-radius: 2px; min-width: 2px; }
 
 .q-divider td {
   padding: 5px 10px !important;

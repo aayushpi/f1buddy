@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import type { DriverState, QualifyingClassification, StintRow } from '../../api/types'
 import type { QualiSegment } from '../../utils/derive'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
-import { buildQualifying, teammatePairs, type QualiRow, type Zone } from '../../utils/qualifying'
+import { buildMiniSectorRows, buildQualifying, teammatePairs, type QualiRow, type Zone } from '../../utils/qualifying'
 
 interface Props {
   drivers: DriverState[]
@@ -17,10 +17,12 @@ interface Props {
   qualifyingSegments: QualiSegment[] | null
 }
 
-type Sub = 'knockout' | 'sectors'
+type Sub = 'mini' | 'knockout' | 'sectors'
 
 /**
- * The Qualifying view. Two sub-tabs matching how a quali session reads:
+ * The Qualifying view. Three sub-tabs matching how a quali session reads:
+ *   - Mini Sectors: each driver's best lap as a coloured mini-sector strip —
+ *     where on track the lap was won or lost.
  *   - Knockout: the provisional grid with the elimination lines drawn through
  *     it, the drop zone, and the gap-to-the-cut bubble.
  *   - Sectors & H2H: where the lap time lives (sector kings, time left on the
@@ -28,12 +30,15 @@ type Sub = 'knockout' | 'sectors'
  * Shown only for Qualifying sessions (gated by the caller).
  */
 export function QualifyingView({ drivers, stints, sessionName, qualifyingResult, qualifyingSegments }: Props) {
-  const [sub, setSub] = useState<Sub>('knockout')
+  const [sub, setSub] = useState<Sub>('mini')
 
   return (
     <div className="practice quali">
       <div className="practice-head">
         <div className="seg practice-subtabs">
+          <button className={sub === 'mini' ? 'active' : ''} onClick={() => setSub('mini')}>
+            Mini Sectors
+          </button>
           <button className={sub === 'knockout' ? 'active' : ''} onClick={() => setSub('knockout')}>
             Knockout
           </button>
@@ -44,11 +49,74 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
         <span className="practice-session">{sessionName}</span>
       </div>
 
-      {sub === 'knockout' ? (
+      {sub === 'mini' ? (
+        <MiniSectors drivers={drivers} />
+      ) : sub === 'knockout' ? (
         <Knockout drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       ) : (
         <Sectors drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       )}
+    </div>
+  )
+}
+
+// ---- Mini-sector strip ----
+
+// OpenF1's marshalling-segment status codes → colour. Best-effort mapping
+// (purple = overall fastest there, green = the driver's own pace, pit/empty
+// greyed); pending a live cross-check of the exact code legend.
+function miniColour(code: number): string {
+  switch (code) {
+    case 2051:
+    case 2052:
+      return 'var(--purple)'
+    case 2049:
+    case 2050:
+      return 'var(--green)'
+    case 2064:
+      return 'rgba(120, 134, 153, 0.45)' // pit lane
+    default:
+      return 'rgba(255, 255, 255, 0.08)' // 0 / 2048 / unknown: not set
+  }
+}
+
+function MiniSectors({ drivers }: { drivers: DriverState[] }) {
+  const rows = useMemo(() => buildMiniSectorRows(drivers), [drivers])
+  const fastest = rows.find((r) => r.bestLap != null)?.bestLap ?? null
+  const hasData = rows.some((r) => r.s1.length || r.s2.length || r.s3.length)
+
+  return (
+    <div className="panel practice-panel q-mini">
+      <div className="qm-legend">
+        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> fastest here</span>
+        <span><i className="qm-key" style={{ background: 'var(--green)' }} /> on pace</span>
+        <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
+        <span className="qm-note">Mini-sector colours from the timing feed — where the lap was won, not split times.</span>
+      </div>
+
+      <div className="qm-scroll">
+        {rows.map((r, i) => {
+          const gap = r.bestLap != null && fastest != null ? r.bestLap - fastest : null
+          return (
+            <div key={r.driverNumber} className={`qm-row ${r.bestLap == null ? 'qm-empty' : ''}`}>
+              <span className="qm-pos">{r.bestLap != null ? i + 1 : '—'}</span>
+              <span className="qm-drv" style={{ color: r.colour }}>{r.acronym}</span>
+              <span className="qm-lap">{formatLapTime(r.bestLap)}</span>
+              <span className="qm-gap">{i === 0 || gap == null ? '' : formatDelta(gap)}</span>
+              <span className="qm-strip">
+                {[r.s1, r.s2, r.s3].map((seg, si) => (
+                  <span key={si} className="qm-seg">
+                    {seg.map((code, ci) => (
+                      <i key={ci} className="qm-cell" style={{ background: miniColour(code) }} />
+                    ))}
+                  </span>
+                ))}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      {!hasData && <div className="practice-empty">No mini-sector data yet this session.</div>}
     </div>
   )
 }
@@ -140,6 +208,9 @@ function Knockout({
             {report.rows.map((r) => {
               const showDivider = report.eliminatedPerSegment > 0 && r.zone !== prevZone && r.bestLap != null
               prevZone = r.bestLap != null ? r.zone : prevZone
+              // Strike a car out only once its cut has actually been made.
+              const eliminated =
+                (r.zone === 'out' && report.q1Settled) || (r.zone === 'q2' && report.q2Settled)
               return (
                 <Fragment key={r.driverNumber}>
                   {showDivider && (
@@ -147,7 +218,9 @@ function Knockout({
                       <td colSpan={9}>{ZONE_LABEL[r.zone]}</td>
                     </tr>
                   )}
-                  <tr className={`q-row q-${r.zone} ${r.onBubble ? 'q-bubble' : ''} ${r.bestLap == null ? 'ts-empty' : ''}`}>
+                  <tr
+                    className={`q-row q-${r.zone} ${eliminated ? 'q-elim' : ''} ${r.onBubble ? 'q-bubble' : ''} ${r.bestLap == null ? 'ts-empty' : ''}`}
+                  >
                     <td className="ts-pos">{r.position}</td>
                     <td className="ts-drv">
                       <span className="ts-drv-inner">

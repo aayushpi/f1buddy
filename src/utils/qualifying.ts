@@ -19,8 +19,9 @@
 // quali-sim, so we reuse buildTimesheet from practice.ts unchanged and layer the
 // knockout + teammate reads on top.
 
-import type { DriverState, QualifyingClassification, StintRow } from '../api/types'
+import type { DriverState, LapDetail, QualifyingClassification, StintRow } from '../api/types'
 import type { QualiSegment } from './derive'
+import { teamHex } from './format'
 import { buildTimesheet, type SectorBests, type TimesheetRow } from './practice'
 
 // Which side of the elimination lines a car currently sits on.
@@ -53,6 +54,11 @@ export interface QualifyingReport {
   // True when the order is the official FIA classification (Q1/Q2/Q3 times),
   // rather than a provisional best-lap timesheet that evolves with the clock.
   official: boolean
+  // Whether each cut has actually been made yet (Q1/Q2 running has ended). The
+  // view only strikes a tier's eliminated cars once its cut is settled, so the
+  // drop zone isn't crossed out while those cars can still improve.
+  q1Settled: boolean
+  q2Settled: boolean
   pole: { acronym: string; colour: string; time: number } | null
   // The field, and the two elimination lines — all derived from the entry list
   // so a 20-car grid (5 out per cut) and a 22-car grid (6 out per cut) both fall
@@ -203,6 +209,18 @@ export function buildQualifying(
     order = sheet.rows.map((r) => ({ driverNumber: r.driverNumber, position: r.position, bestLap: r.bestLap }))
   }
 
+  // Whether each cut has been made yet — true throughout the official result;
+  // during the provisional knockout, derived from how far the revealed laps have
+  // progressed past each segment's start.
+  let q1Settled = useOfficial
+  let q2Settled = useOfficial
+  if (useKnockout) {
+    let maxDate = -Infinity
+    for (const d of drivers) for (const l of d.lapHistory) if (l.date != null && l.date > maxDate) maxDate = l.date
+    q1Settled = maxDate >= segments![1].start
+    q2Settled = maxDate >= segments![2].start
+  }
+
   const fieldSize = order.length
   const { q3Cut, q1Cut, eliminatedPerSegment } = deriveCuts(fieldSize)
 
@@ -287,12 +305,58 @@ export function buildQualifying(
     sessionBest: sheet.sessionBest,
     theoreticalBest: sheet.theoreticalBest,
     official: useOfficial,
+    q1Settled,
+    q2Settled,
     pole,
     fieldSize,
     q3Cut,
     q1Cut,
     eliminatedPerSegment,
   }
+}
+
+// ---- Mini-sector strip ----
+
+export interface MiniSectorRow {
+  driverNumber: number
+  acronym: string
+  colour: string
+  bestLap: number | null
+  // Mini-sector status codes for the driver's best lap, one array per sector.
+  s1: number[]
+  s2: number[]
+  s3: number[]
+}
+
+/**
+ * Each driver's best lap rendered as its mini-sector status codes, fastest lap
+ * first — the data behind the qualifying mini-sector strip. OpenF1 gives the
+ * marshalling-segment colours (purple/green/yellow/pit), not per-mini-sector
+ * times, so this is a *where-on-track* read, not a numeric split.
+ */
+export function buildMiniSectorRows(drivers: DriverState[]): MiniSectorRow[] {
+  const rows: MiniSectorRow[] = drivers.map((d) => {
+    let best: LapDetail | null = null
+    for (const l of d.lapHistory) {
+      if (l.time == null || !Number.isFinite(l.time)) continue
+      if (best == null || l.time < best.time!) best = l
+    }
+    return {
+      driverNumber: d.driverNumber,
+      acronym: d.acronym,
+      colour: teamHex(d.teamColour),
+      bestLap: best?.time ?? null,
+      s1: best?.seg1 ?? [],
+      s2: best?.seg2 ?? [],
+      s3: best?.seg3 ?? [],
+    }
+  })
+  rows.sort((a, b) => {
+    if (a.bestLap == null) return b.bestLap == null ? 0 : 1
+    if (b.bestLap == null) return -1
+    return a.bestLap - b.bestLap
+  })
+  return rows
 }
 
 // ---- Teammate head-to-head ----
