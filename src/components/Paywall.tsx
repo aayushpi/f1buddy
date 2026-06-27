@@ -9,7 +9,7 @@ interface Props {
 }
 
 // Where donors / subscribers send proof and receive a key back.
-const CONTACT = 'unnecessaryroughness@proton.me'
+const CONTACT = 'xoxo@aayush.fyi'
 const KOFI_URL = 'https://ko-fi.com/aayushpi'
 const TRANS_LIFELINE_URL = 'https://translifeline.org/donate/'
 const MECA_URL = 'https://secure.everyaction.com/X61pOYGcOUiGoTfHn7p1uQ2'

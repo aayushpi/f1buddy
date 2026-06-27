@@ -7,7 +7,7 @@ hand-issued key:
 - **$3+/month** via **Ko-fi** (membership tier), or
 - **$30 donation** to **Trans Lifeline** or **MECA**.
 
-Either way the supporter emails `unnecessaryroughness@proton.me` (their Ko-fi name
+Either way the supporter emails `xoxo@aayush.fyi` (their Ko-fi name
 or the receipt); I email back one phrase.
 
 **Links wired into `Paywall.tsx`:**
