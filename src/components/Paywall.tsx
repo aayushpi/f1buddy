@@ -47,33 +47,43 @@ export function Paywall({ onUnlock, onCancel }: Props) {
             <span className="paywall-opt-amt">$30 donation</span>
             <span className="paywall-opt-desc">Donate to either, then send me the receipt:</span>
             <div className="paywall-logos">
-              <a
-                className="paywall-logo"
-                href={TRANS_LIFELINE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Donate to Trans Lifeline"
-              >
-                <img src="/logos/trans-lifeline.png" alt="Trans Lifeline" />
-              </a>
-              <a
-                className="paywall-logo light"
-                href={MECA_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Donate to the Middle East Children's Alliance"
-              >
-                <img src="/logos/meca.jpg" alt="Middle East Children's Alliance" />
-              </a>
+              <div className="paywall-donor">
+                <a
+                  className="paywall-logo"
+                  href={TRANS_LIFELINE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Donate to Trans Lifeline"
+                >
+                  <img src="/logos/trans-lifeline.png" alt="Trans Lifeline" />
+                </a>
+                <a className="paywall-donor-link" href={TRANS_LIFELINE_URL} target="_blank" rel="noopener noreferrer">
+                  Trans Lifeline →
+                </a>
+              </div>
+              <div className="paywall-donor">
+                <a
+                  className="paywall-logo light"
+                  href={MECA_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Donate to the Middle East Children's Alliance"
+                >
+                  <img src="/logos/meca.jpg" alt="Middle East Children's Alliance" />
+                </a>
+                <a className="paywall-donor-link" href={MECA_URL} target="_blank" rel="noopener noreferrer">
+                  Middle East Children’s Alliance →
+                </a>
+              </div>
             </div>
           </div>
 
           <div className="paywall-or">or</div>
 
           <div className="paywall-opt">
-            <span className="paywall-opt-amt">$3+/month</span>
+            <span className="paywall-opt-amt">Throw me a few bucks</span>
             <a className="paywall-cta" href={KOFI_URL} target="_blank" rel="noopener noreferrer">
-              Support me on Ko-fi →
+              Support →
             </a>
           </div>
         </div>
