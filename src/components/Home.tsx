@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import type { OpenF1Config } from '../api/openf1'
 import { useCalendar } from '../hooks/useCalendar'
 import { SessionPicker } from './SessionPicker'
+import { Paywall } from './Paywall'
+import { isUnlocked } from '../utils/access'
 import { CardiogramMark, CG_HERO_PATH } from './Brand'
 import { findCircuit, type CircuitPt } from '../data/circuits'
 
@@ -211,6 +213,9 @@ function TrackPulse({ points, mode }: { points: CircuitPt[]; mode: Mode }) {
 export function Home({ config, onEnterLive, onReplay }: Props) {
   const cal = useCalendar(config)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // A deferred "open this session" action, parked while the paywall is shown
+  // because the chosen session is gated and there's no current unlock.
+  const [pendingAccess, setPendingAccess] = useState<(() => void) | null>(null)
   // Tick once a second so the countdown updates smoothly between calendar polls.
   const [, setNow] = useState(Date.now())
   useEffect(() => {
@@ -242,16 +247,37 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
   // Off-season promotes "Replay the last race" with an accent border.
   const replayPromoted = mode === 'off'
 
+  // Gated sessions (live + the latest two race weekends) need a current unlock;
+  // run the action straight away when free or already unlocked, else park it
+  // behind the paywall and run it once a key is redeemed.
+  const guard = (gated: boolean, action: () => void) => {
+    if (!gated || isUnlocked()) action()
+    else setPendingAccess(() => action)
+  }
+
   // Conditional return must sit BELOW every hook above (React hooks must run in
   // the same order each render) — otherwise opening the picker crashes the app.
+  if (pendingAccess) {
+    return (
+      <Paywall
+        onUnlock={() => {
+          const action = pendingAccess
+          setPendingAccess(null)
+          action()
+        }}
+        onCancel={() => setPendingAccess(null)}
+      />
+    )
+  }
+
   if (pickerOpen) {
     return (
       <SessionPicker
         config={config}
         onClose={() => setPickerOpen(false)}
-        onPick={(key, simulate) => {
+        onPick={(key, simulate, gated) => {
           setPickerOpen(false)
-          onReplay(key, simulate)
+          guard(gated, () => onReplay(key, simulate))
         }}
       />
     )
@@ -291,7 +317,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
               </div>
               <div className="hero-title">{live.meetingName}</div>
               <div className="hero-sub">{live.sessionName} is running</div>
-              <button className="hero-cta" onClick={() => onEnterLive(live.sessionKey)}>
+              <button className="hero-cta" onClick={() => guard(true, () => onEnterLive(live.sessionKey))}>
                 Enter live session →
               </button>
             </div>
@@ -329,9 +355,23 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
 
           {mode === 'error' && (
             <div className="hero-body">
-              <div className="hero-kicker err">Signal lost</div>
-              <div className="hero-title">Couldn’t reach OpenF1</div>
-              <div className="hero-sub">Check your connection — you can still load a past session below.</div>
+              {cal.liveLocked ? (
+                <>
+                  <div className="hero-kicker err">Live session — locked</div>
+                  <div className="hero-title">OpenF1 is authenticated-only right now</div>
+                  <div className="hero-sub">
+                    A session is live, so OpenF1 restricts all data — even past races — to
+                    authenticated users until it ends. Route the app through the proxy with your
+                    OpenF1 credentials, or check back after the session.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="hero-kicker err">Signal lost</div>
+                  <div className="hero-title">Couldn’t reach OpenF1</div>
+                  <div className="hero-sub">Check your connection — you can still load a past session below.</div>
+                </>
+              )}
             </div>
           )}
         </motion.div>
@@ -340,7 +380,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
           {cal.lastRace && (
             <motion.button
               className={`home-action ${replayPromoted ? 'promoted' : ''}`}
-              onClick={() => onReplay(cal.lastRace!.sessionKey, false)}
+              onClick={() => guard(true, () => onReplay(cal.lastRace!.sessionKey, false))}
               whileTap={{ scale: 0.98 }}
             >
               <span className="home-action-icon">↺</span>

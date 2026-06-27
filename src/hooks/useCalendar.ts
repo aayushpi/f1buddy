@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, type OpenF1Config } from '../api/openf1'
+import { api, OpenF1AuthError, type OpenF1Config } from '../api/openf1'
 import type { ApiMeeting, ApiSession } from '../api/types'
 
 // OpenF1 keeps serving a session as "live" until 30 min after its scheduled end
@@ -20,6 +20,9 @@ export interface CalendarSession {
 
 export interface Calendar {
   state: 'loading' | 'ready' | 'error'
+  // The error was OpenF1 locking access during a live session (not a network
+  // failure) — the connection is fine, it's an auth gate. Drives the message.
+  liveLocked: boolean
   // A session running right now (start ≤ now ≤ end + 30min), if any.
   live: CalendarSession | null
   // The next session that hasn't started yet, if any.
@@ -43,6 +46,7 @@ export function useCalendar(config: OpenF1Config, reloadNonce = 0): Calendar {
   const thisYear = new Date().getFullYear()
   const [sessions, setSessions] = useState<CalendarSession[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [liveLocked, setLiveLocked] = useState(false)
   const [year, setYear] = useState(thisYear)
   // A 1s heartbeat so the live/next/countdown derivation stays current.
   const [, setTick] = useState(0)
@@ -56,6 +60,7 @@ export function useCalendar(config: OpenF1Config, reloadNonce = 0): Calendar {
     let cancelled = false
     const controller = new AbortController()
     setState('loading')
+    setLiveLocked(false)
     setSessions([])
 
     const load = async (yr: number): Promise<CalendarSession[]> => {
@@ -95,8 +100,11 @@ export function useCalendar(config: OpenF1Config, reloadNonce = 0): Calendar {
         setYear(yr)
         setSessions(list)
         setState('ready')
-      } catch {
-        if (!cancelled && !controller.signal.aborted) setState('error')
+      } catch (e) {
+        if (!cancelled && !controller.signal.aborted) {
+          setLiveLocked(e instanceof OpenF1AuthError && e.liveLocked)
+          setState('error')
+        }
       }
     })()
 
@@ -115,7 +123,7 @@ export function useCalendar(config: OpenF1Config, reloadNonce = 0): Calendar {
     for (const s of sessions) {
       if (s.end < now && isRace(s)) lastRace = s // sessions are sorted ascending
     }
-    return { state, live, next, lastRace, year }
+    return { state, liveLocked, live, next, lastRace, year }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, state, year, Math.floor(Date.now() / 1000)])
+  }, [sessions, state, liveLocked, year, Math.floor(Date.now() / 1000)])
 }

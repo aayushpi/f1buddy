@@ -208,6 +208,9 @@ export interface LapDetail {
   s2: number | null
   s3: number | null
   pitOut: boolean
+  // Epoch ms the lap started (null if the feed has no start time). Lets the
+  // qualifying view bucket each lap into its Q1/Q2/Q3 window.
+  date: number | null
 }
 
 export interface DriverState {
@@ -360,6 +363,17 @@ export interface ResultRow {
   status: 'FIN' | 'DNF' | 'DNS' | 'DSQ'
 }
 
+// The official qualifying classification, straight from session_result. Unlike a
+// recomputed timesheet this is the authoritative FIA order: a driver who reaches
+// a segment but sets no time there is still classified at the back of that group
+// (e.g. into Q3 with no Q3 lap ⇒ P10), which a naive "overall best lap" sort gets
+// wrong. `segments` is each driver's best lap in [Q1, Q2, Q3], null where untimed.
+export interface QualifyingClassification {
+  driverNumber: number
+  position: number | null
+  segments: [number | null, number | null, number | null]
+}
+
 export interface WeatherPoint {
   date: string
   airTemp: number | null
@@ -378,6 +392,10 @@ export interface RaceState {
   countryName: string
   meetingName: string
   year: number | null
+  // Scheduled session start / end (epoch ms), for the session-clock countdown.
+  // null when the feed carries no usable dates.
+  sessionStart: number | null
+  sessionEnd: number | null
   status: TrackStatus
   currentLap: number | null
   lastMessage: string | null
@@ -400,5 +418,10 @@ export interface RaceSnapshot {
   raceControlLog: RaceControlEntry[]
   grid: GridRow[]
   results: ResultRow[]
+  // Official qualifying order (Q1/Q2/Q3 times), present only once the replay
+  // clock reaches the end of a qualifying session; null while it is still
+  // playing out (the view then shows the provisional, evolving order). Lets the
+  // final grid land exactly on the FIA result without spoiling the session.
+  qualifyingResult: QualifyingClassification[] | null
   weatherHistory: WeatherPoint[]
 }

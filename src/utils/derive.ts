@@ -20,6 +20,7 @@ import type {
   GridRow,
   OvertakeEvent,
   PitEvent,
+  QualifyingClassification,
   RaceControlEntry,
   RaceSnapshot,
   RaceState,
@@ -52,6 +53,10 @@ export interface RawData {
   overtakes: ApiOvertake[]
   startingGrid: ApiStartingGrid[]
   results: ApiSessionResult[]
+  // Official qualifying classification, revealed only once the replay clock has
+  // reached the end of the session (so the grid plays out provisionally before
+  // snapping to the final order). Derived in filterRawByTime; empty otherwise.
+  qualifyingResults: ApiSessionResult[]
 }
 
 export const TELEMETRY_TRACE_LEN = 70
@@ -74,6 +79,88 @@ export function indexRawTimes(raw: RawData): void {
   for (const l of raw.laps as ({ date_start: string | null } & Timed)[]) {
     l.__t = l.date_start ? Date.parse(l.date_start) : NaN
   }
+}
+
+// A qualifying knockout segment (Q1/Q2/Q3) as a running time window. The gaps
+// *between* windows are the inter-segment breaks the scrubber shades.
+export interface QualiSegment {
+  seg: 1 | 2 | 3
+  start: number
+  end: number
+}
+
+/**
+ * Locate the Q1/Q2/Q3 windows for a qualifying session (OpenF1 carries no
+ * segment field). Pure lap-gap detection is fooled by red flags and mid-segment
+ * pit cycles, so instead we anchor on the official result: each driver's
+ * session_result duration is their [Q1, Q2, Q3] best-lap times. We match each
+ * back to the lap that set it — in time order per driver, since a car's segments
+ * happen Q1→Q2→Q3, which stops a coincidentally equal lap time elsewhere from
+ * stealing the match — then take each segment's window as the span of those
+ * classified laps. Returns null until the result is known or if the windows
+ * don't come out cleanly ordered (degenerate data).
+ */
+export function buildQualifyingSegments(raw: RawData): QualiSegment[] | null {
+  if (!raw.results.length || raw.laps.length < 12) return null
+
+  // Each driver's timed laps, ascending by start, with the lap time to match on.
+  const byDriver = new Map<number, { start: number; dur: number }[]>()
+  for (const l of raw.laps) {
+    const start = lapT(l)
+    if (!Number.isFinite(start) || l.lap_duration == null || l.lap_duration <= 0) continue
+    const arr = byDriver.get(l.driver_number) ?? []
+    arr.push({ start, dur: l.lap_duration })
+    byDriver.set(l.driver_number, arr)
+  }
+  for (const arr of byDriver.values()) arr.sort((a, b) => a.start - b.start)
+
+  const segStarts: [number[], number[], number[]] = [[], [], []]
+  for (const r of raw.results) {
+    const dur = Array.isArray(r.duration) ? r.duration : []
+    const laps = byDriver.get(r.driver_number) ?? []
+    let after = -Infinity
+    for (let si = 0; si < 3; si++) {
+      const t = dur[si]
+      if (t == null) continue
+      const m = laps.find((l) => l.start > after && Math.abs(l.dur - t) < 0.01)
+      if (m) {
+        segStarts[si].push(m.start)
+        after = m.start
+      }
+    }
+  }
+  if (segStarts.some((s) => s.length === 0)) return null
+
+  const win = (i: 0 | 1 | 2) => ({ start: Math.min(...segStarts[i]), end: Math.max(...segStarts[i]) })
+  const q1 = win(0)
+  const q2 = win(1)
+  const q3 = win(2)
+  if (!(q1.end <= q2.start && q2.end <= q3.start)) return null
+
+  return [
+    { seg: 1, start: q1.start, end: q1.end },
+    { seg: 2, start: q2.start, end: q2.end },
+    { seg: 3, start: q3.start, end: q3.end },
+  ]
+}
+
+// Density of lap activity across the timeline, as `bins` values in 0..1 (peak =
+// 1). Drives the scrubber's "clustermap" — for practice it shows the run pattern,
+// for qualifying the three knockout clusters fall out for free — without ever
+// surfacing a lap number. Only laps up to `tCut` are counted so a simulated-live
+// replay can't reveal activity past the watchable edge.
+export function buildLapActivity(raw: RawData, tMin: number, tMax: number, tCut: number, bins = 120): number[] {
+  const span = tMax - tMin
+  if (!(span > 0)) return []
+  const counts = new Array<number>(bins).fill(0)
+  for (const l of raw.laps) {
+    const s = lapT(l)
+    if (!Number.isFinite(s) || s > tCut) continue
+    const idx = Math.min(bins - 1, Math.max(0, Math.floor(((s - tMin) / span) * bins)))
+    counts[idx]++
+  }
+  const max = Math.max(1, ...counts)
+  return counts.map((c) => c / max)
 }
 
 /** Lap-start times (leader's crossing) for the replay scrubber markers. */
@@ -165,6 +252,13 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
   const stints = raw.stints.filter((s) => s.lap_start <= currentLap)
   const finished = cutoffMs >= raceEndMs - 500
 
+  // The qualifying classification only appears once the replay clock reaches the
+  // end of the session — until then the grid builds up provisionally, lap by
+  // lap, the same way it did live. (It rides its own field rather than `results`
+  // because it carries the Q1/Q2/Q3 segment times, and so it can't flip the
+  // session to "finished" early via `race.finished`.)
+  const isQualifying = (raw.session?.session_type ?? '').toLowerCase().includes('qual')
+
   return {
     session: raw.session,
     meeting: raw.meeting,
@@ -182,6 +276,7 @@ export function filterRawByTime(raw: RawData, cutoffMs: number, raceEndMs: numbe
     teamRadio: dateLte(raw.teamRadio),
     overtakes: dateLte(raw.overtakes),
     results: finished ? raw.results : [],
+    qualifyingResults: isQualifying && finished ? raw.results : [],
   }
 }
 
@@ -220,42 +315,86 @@ function deriveStatus(rc: ApiRaceControl[]): {
   finished: boolean
 } {
   const sorted = [...rc].sort((a, b) => (a.date < b.date ? -1 : 1))
-  let status: TrackStatus = 'UNKNOWN'
   let lastMessage: string | null = null
   let finished = false
+
+  // Reconstruct the track state by folding the (clock-filtered) log into a small
+  // state machine, then collapse to one status by severity at the end. The old
+  // flat fold only looked at Track-scoped flags, so per-sector yellows — which is
+  // how nearly all yellow/double-yellow flags actually arrive — never showed.
+  let sc: 'none' | 'VSC' | 'SC' = 'none'
+  let red = false
+  let chequered = false
+  let trackYellow: 'none' | 'YELLOW' | 'DOUBLE_YELLOW' = 'none'
+  const sectorFlags = new Map<number, 'YELLOW' | 'DOUBLE_YELLOW'>()
+  let seen = false // any recognised status event — else we stay UNKNOWN
 
   for (const m of sorted) {
     lastMessage = m.message ?? lastMessage
     const msg = (m.message ?? '').toUpperCase()
+    const flag = (m.flag ?? '').toUpperCase()
 
     if (m.category === 'SafetyCar') {
-      if (msg.includes('VIRTUAL')) status = msg.includes('ENDING') ? 'GREEN' : 'VSC'
-      else if (msg.includes('SAFETY CAR'))
-        status = msg.includes('IN THIS LAP') || msg.includes('ENDING') ? 'GREEN' : 'SC'
+      if (msg.includes('VIRTUAL')) {
+        sc = msg.includes('ENDING') ? 'none' : 'VSC'
+        seen = true
+      } else if (msg.includes('SAFETY CAR')) {
+        // "DEPLOYED" raises it; "IN THIS LAP" / "ENDING" stands it down.
+        sc = msg.includes('IN THIS LAP') || msg.includes('ENDING') ? 'none' : 'SC'
+        seen = true
+      }
       continue
     }
-    if (m.category === 'Flag' && (m.scope === 'Track' || !m.scope)) {
-      switch ((m.flag ?? '').toUpperCase()) {
-        case 'GREEN':
-        case 'CLEAR':
-          status = 'GREEN'
-          break
-        case 'YELLOW':
-          if (status === 'GREEN' || status === 'UNKNOWN') status = 'YELLOW'
-          break
-        case 'DOUBLE YELLOW':
-          status = 'DOUBLE_YELLOW'
-          break
-        case 'RED':
-          status = 'RED'
-          break
-        case 'CHEQUERED':
-          status = 'CHEQUERED'
-          finished = true
-          break
+    if (m.category !== 'Flag') continue
+
+    const sector = m.sector
+    switch (flag) {
+      case 'YELLOW':
+      case 'DOUBLE YELLOW': {
+        const level = flag === 'DOUBLE YELLOW' ? 'DOUBLE_YELLOW' : 'YELLOW'
+        if (m.scope === 'Sector' && sector != null) sectorFlags.set(sector, level)
+        else trackYellow = level
+        seen = true
+        break
       }
+      case 'GREEN':
+      case 'CLEAR':
+        if (m.scope === 'Sector' && sector != null) {
+          sectorFlags.delete(sector)
+        } else {
+          // Track-wide green: racing resumes — everything clears.
+          sectorFlags.clear()
+          trackYellow = 'none'
+          red = false
+        }
+        seen = true
+        break
+      case 'RED':
+        red = true
+        seen = true
+        break
+      case 'CHEQUERED':
+        chequered = true
+        finished = true
+        seen = true
+        break
     }
   }
+
+  const anyDoubleYellow = trackYellow === 'DOUBLE_YELLOW' || [...sectorFlags.values()].includes('DOUBLE_YELLOW')
+  const anyYellow = trackYellow !== 'none' || sectorFlags.size > 0
+
+  // Most severe wins. Chequered only shows once the track is otherwise clear.
+  let status: TrackStatus
+  if (!seen) status = 'UNKNOWN'
+  else if (red) status = 'RED'
+  else if (sc === 'SC') status = 'SC'
+  else if (sc === 'VSC') status = 'VSC'
+  else if (anyDoubleYellow) status = 'DOUBLE_YELLOW'
+  else if (anyYellow) status = 'YELLOW'
+  else if (chequered) status = 'CHEQUERED'
+  else status = 'GREEN'
+
   return { status, lastMessage, finished }
 }
 
@@ -334,14 +473,18 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     const lapHistory = allLaps
       .slice()
       .sort((a, b) => a.lap_number - b.lap_number)
-      .map((l) => ({
-        lap: l.lap_number,
-        time: l.lap_duration,
-        s1: l.duration_sector_1,
-        s2: l.duration_sector_2,
-        s3: l.duration_sector_3,
-        pitOut: l.is_pit_out_lap,
-      }))
+      .map((l) => {
+        const d = lapT(l)
+        return {
+          lap: l.lap_number,
+          time: l.lap_duration,
+          s1: l.duration_sector_1,
+          s2: l.duration_sector_2,
+          s3: l.duration_sector_3,
+          pitOut: l.is_pit_out_lap,
+          date: Number.isFinite(d) ? d : null,
+        }
+      })
     const avgLapTime = lapTimes.length
       ? lapTimes.reduce((acc, p) => acc + p.time, 0) / lapTimes.length
       : null
@@ -580,6 +723,21 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
       status: r.dsq ? 'DSQ' : r.dns ? 'DNS' : r.dnf ? 'DNF' : 'FIN',
     }))
 
+  // ---- Qualifying classification (official, ungated) ----
+  // session_result.duration is the [Q1, Q2, Q3] best-lap array for a qualifying
+  // session. Carry it verbatim so the view can show the real grid; a single
+  // number (non-qualifying) collapses to a Q1-only entry and simply goes unused.
+  const qualifyingResult: QualifyingClassification[] | null = raw.qualifyingResults.length
+    ? raw.qualifyingResults.map((r) => {
+        const dur = Array.isArray(r.duration) ? r.duration : r.duration != null ? [r.duration] : []
+        return {
+          driverNumber: r.driver_number,
+          position: r.position,
+          segments: [dur[0] ?? null, dur[1] ?? null, dur[2] ?? null],
+        } satisfies QualifyingClassification
+      })
+    : null
+
   // ---- Weather history ----
   const weatherHistory: WeatherPoint[] = raw.weather
     .slice()
@@ -605,6 +763,8 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     countryName: raw.session?.country_name ?? '',
     meetingName: raw.meeting?.meeting_name ?? raw.session?.location ?? '',
     year: raw.session?.year ?? null,
+    sessionStart: Number.isFinite(t(raw.session?.date_start)) ? t(raw.session?.date_start) : null,
+    sessionEnd: Number.isFinite(t(raw.session?.date_end)) ? t(raw.session?.date_end) : null,
     status,
     currentLap,
     lastMessage,
@@ -625,6 +785,7 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
     raceControlLog,
     grid,
     results,
+    qualifyingResult,
     weatherHistory,
   }
 }

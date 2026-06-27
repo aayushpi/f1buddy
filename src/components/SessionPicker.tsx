@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { api, type OpenF1Config } from '../api/openf1'
 import { findCircuit } from '../data/circuits'
+import { isUnlocked } from '../utils/access'
 import type { ApiMeeting, ApiSession } from '../api/types'
 
 interface Props {
   config: OpenF1Config
   // simulate=true replays the picked session as if live; false loads the full race.
-  onPick: (sessionKey: number, simulate: boolean) => void
+  // gated=true when the session is in the latest two race weekends (paid).
+  onPick: (sessionKey: number, simulate: boolean, gated: boolean) => void
   onClose: () => void
 }
 
@@ -28,6 +30,18 @@ function countryFlag(name: string | undefined): string {
   const code = name ? ISO2[name] : undefined
   if (!code) return '🏁'
   return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+}
+
+// A Grand Prix weekend runs ~Fri→Sun. With only date_start to go on, treat a
+// meeting as happening "now" for a few days after it opens, future before it,
+// past after — used to emphasise the live weekend and dim what hasn't run yet.
+const WEEKEND_MS = 4 * 24 * 60 * 60 * 1000
+function meetingPhase(m: ApiMeeting, now: number): 'past' | 'current' | 'future' {
+  const start = Date.parse(m.date_start)
+  if (!Number.isFinite(start)) return 'past'
+  if (now < start) return 'future'
+  if (now <= start + WEEKEND_MS) return 'current'
+  return 'past'
 }
 
 function fmtDate(iso: string | undefined): string {
@@ -88,6 +102,19 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
   const [selected, setSelected] = useState<ApiMeeting | null>(null)
   const [sessions, setSessions] = useState<ApiSession[]>([])
   const [sessionsState, setSessionsState] = useState<'idle' | 'loading' | 'error'>('idle')
+
+  // A redeemed device already has access to the gated weekends, so don't tease
+  // it with locks — the padlocks are only a prompt for users who still need a key.
+  const unlocked = isUnlocked()
+
+  // The latest two race weekends are gated (paid); everything older is free.
+  // Only the current season can be recent — past years are always free.
+  const gatedMeetings = useMemo(() => {
+    if (year !== new Date().getFullYear()) return new Set<number>()
+    const now = Date.now()
+    const started = meetings.filter((m) => Date.parse(m.date_start) <= now) // meetings are sorted ascending
+    return new Set(started.slice(-2).map((m) => m.meeting_key))
+  }, [meetings, year])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (selected ? setSelected(null) : onClose())
@@ -169,19 +196,29 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
             <div className="picker-note">No Grands Prix found for {year}.</div>
           )}
           <div className="picker-grid">
-            {meetings.map((m) => (
-              <motion.button
-                key={m.meeting_key}
-                className="gp-card"
-                onClick={() => setSelected(m)}
-                whileTap={{ scale: 0.97 }}
-              >
-                <TrackThumb meeting={m} />
-                <span className="gp-country">{m.country_name}</span>
-                <span className="gp-name">{m.meeting_name}</span>
-                <span className="gp-date">{fmtDate(m.date_start)}</span>
-              </motion.button>
-            ))}
+            {meetings.map((m) => {
+              const phase = meetingPhase(m, Date.now())
+              return (
+                <motion.button
+                  key={m.meeting_key}
+                  className={`gp-card ${phase}`}
+                  onClick={() => setSelected(m)}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  {phase === 'current' && <span className="gp-now">● This weekend</span>}
+                  {!unlocked && gatedMeetings.has(m.meeting_key) && phase !== 'current' && (
+                    <span className="gp-lock" title="Recent weekend — members only">🔒</span>
+                  )}
+                  <TrackThumb meeting={m} />
+                  <span className="gp-country">
+                    <span className="gp-flag">{countryFlag(m.country_name)}</span>
+                    {m.country_name}
+                  </span>
+                  <span className="gp-name">{m.meeting_name}</span>
+                  <span className="gp-date">{fmtDate(m.date_start)}</span>
+                </motion.button>
+              )
+            })}
           </div>
         </div>
       ) : (
@@ -200,10 +237,12 @@ export function SessionPicker({ config, onPick, onClose }: Props) {
                 <motion.button
                   key={s.session_key}
                   className={`ses-card ${s.session_type?.toLowerCase() === 'race' ? 'race' : ''}`}
-                  onClick={() => onPick(s.session_key, simulate)}
+                  onClick={() => onPick(s.session_key, simulate, selected ? gatedMeetings.has(selected.meeting_key) : false)}
                   whileTap={{ scale: 0.97 }}
                 >
-                  <span className="ses-name">▶ {s.session_name}</span>
+                  <span className="ses-name">
+                    {!unlocked && selected && gatedMeetings.has(selected.meeting_key) ? '🔒' : '▶'} {s.session_name}
+                  </span>
                   <span className="ses-date">{fmtDate(s.date_start)}</span>
                 </motion.button>
               ))}

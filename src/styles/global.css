@@ -1138,6 +1138,27 @@ button {
   background: rgba(228, 182, 86, 0.92); /* warm amber: distinct from cyan racing + slate pre-race */
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.6); /* lights-out boundary */
 }
+/* Lap-activity clustermap (practice + qualifying): a row of density bars over
+   the track. Dense running stands tall and bright; the quiet stretches between
+   qualifying segments fall away to almost nothing, so the Q1/Q2/Q3 clusters read
+   without ever printing a lap number. */
+.lap-activity {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  pointer-events: none;
+}
+.la-bar {
+  flex: 1 1 0;
+  min-height: 1px;
+  border-radius: 1px 1px 0 0;
+  background: var(--accent);
+}
 /* "Pre-race" sits at the very left of the same row as the lap numbers. */
 .prerace-label {
   position: absolute;
@@ -1154,6 +1175,24 @@ button {
   transform: translateX(-50%);
   color: #e3c270;
 }
+/* Q1/Q2/Q3 markers: clickable, centred over each qualifying segment window. */
+.quali-seg-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #aeb6cc;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.quali-seg-label:hover { color: var(--accent); }
 .scrub::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px; height: 16px;
@@ -2001,7 +2040,111 @@ button {
   text-align: left;
   transition: border-color 0.14s, background 0.14s;
 }
+.gp-card { position: relative; }
 .gp-card:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.07); }
+/* Future events haven't run — nothing to load yet — so dim them back. */
+.gp-card.future { opacity: 0.4; }
+.gp-card.future:hover { opacity: 0.7; }
+/* The weekend that's happening now: lift it with an accent ring + glow. */
+.gp-card.current {
+  border-color: var(--green);
+  background: rgba(34, 224, 122, 0.07);
+  box-shadow: 0 0 0 1px var(--green), 0 0 22px rgba(34, 224, 122, 0.18);
+}
+.gp-now {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--green); padding: 3px 7px; border-radius: 999px;
+  background: rgba(34, 224, 122, 0.12); border: 1px solid var(--green);
+}
+.gp-flag { font-size: 14px; margin-right: 6px; letter-spacing: 0; }
+.gp-lock {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  font-size: 12px; opacity: 0.8;
+}
+
+/* -------------------------------------------------------------------------
+   Paywall — the access gate for recent (latest two weekend) sessions.
+   ------------------------------------------------------------------------- */
+.paywall {
+  position: relative; min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.paywall-card {
+  position: relative; z-index: 1; width: 100%; max-width: 520px;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 28px; border-radius: var(--radius);
+  border: 1px solid var(--border-strong); background: var(--panel-strong);
+}
+.paywall-kicker {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent);
+}
+.paywall-title { font-size: 28px; font-weight: 800; margin: 0; }
+.paywall-lede { margin: 0; color: var(--text-dim); line-height: 1.5; font-size: 14px; }
+.paywall-options { display: flex; flex-direction: column; gap: 10px; margin: 4px 0; }
+.paywall-opt {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel);
+}
+.paywall-opt-amt { font-size: 18px; font-weight: 800; color: var(--text); }
+.paywall-opt-desc { font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+.paywall-opt-desc a { color: var(--accent); }
+.paywall-or { text-align: center; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.paywall-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.paywall-logos { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-top: 6px; }
+.paywall-donor { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.paywall-donor-link {
+  font-size: 12px; font-weight: 700; color: var(--accent); text-decoration: none; text-align: left;
+}
+.paywall-donor-link:hover { text-decoration: underline; }
+.paywall-logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 16px; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--panel);
+  transition: border-color 0.14s, background 0.14s;
+}
+.paywall-logo:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.08); }
+.paywall-logo img { height: 30px; width: auto; max-width: 180px; object-fit: contain; display: block; }
+/* The MECA mark is full-colour on white, so it gets a light chip to read on the dark card. */
+.paywall-logo.light { background: #fff; }
+.paywall-logo.light:hover { background: #fff; }
+.paywall-cta {
+  display: inline-flex; align-items: center; align-self: flex-start; margin-top: 2px;
+  padding: 7px 13px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  color: var(--text); text-decoration: none;
+  border: 1px solid var(--border-strong); background: var(--panel);
+  transition: border-color 0.14s, background 0.14s;
+}
+.paywall-cta:hover { border-color: var(--accent); background: rgba(140, 170, 255, 0.08); }
+.paywall-contact { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+.paywall-contact a { color: var(--accent); }
+/* Mail link with no visible address: opens the client on click, address lives
+   only in the handler (not in the markup or a hover tooltip). */
+.paywall-maillink {
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); text-decoration: underline;
+}
+.paywall-maillink:hover { color: var(--text); }
+.paywall-form { display: flex; gap: 8px; margin-top: 4px; }
+.paywall-input {
+  flex: 1 1 auto; min-width: 0; padding: 11px 14px; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--panel); color: var(--text);
+  font-size: 15px;
+}
+.paywall-input::placeholder { color: var(--muted); }
+.paywall-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(25,227,255,0.15); }
+.paywall-go {
+  flex: 0 0 auto; padding: 0 18px; border-radius: 10px; border: none; cursor: pointer;
+  font-weight: 800; color: #04121a; background: linear-gradient(120deg, var(--accent), #59f0ff);
+}
+.paywall-go:disabled { opacity: 0.5; cursor: default; }
+.paywall-err { color: var(--red); font-size: 12px; }
+.paywall-back {
+  align-self: flex-start; margin-top: 4px; background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 13px;
+}
+.paywall-back:hover { color: var(--text); }
 .gp-thumb {
   height: 88px;
   margin-bottom: 10px;
@@ -2182,3 +2325,270 @@ button {
   .picker-grid { grid-template-columns: 1fr 1fr; }
   .picker-sessions { grid-template-columns: 1fr 1fr; }
 }
+
+/* ============================================================
+   Free Practice view (P1/P2/P3 only): quali-sim timesheet + long runs.
+   ============================================================ */
+.practice { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.practice-head { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+.practice-subtabs { align-self: flex-start; }
+.practice-session {
+  margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.session-clock {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px; border: 1px solid var(--border-strong); border-radius: 999px;
+  background: var(--panel-strong);
+}
+.session-clock-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.6s infinite;
+}
+.session-clock-time { font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.session-clock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.session-clock.ended .session-clock-dot { background: var(--muted); box-shadow: none; animation: none; }
+/* Compact fit when it sits beside the scrubber (replacing the time-of-day). */
+.replay-scrub .session-clock { flex: 0 0 auto; padding: 3px 9px; }
+.replay-scrub .session-clock-time { font-size: 13px; }
+.practice-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.practice-empty { padding: 28px 16px; color: var(--muted); font-size: 13px; text-align: center; }
+
+/* Quali-sim banner */
+.practice-banner {
+  display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 14px 16px;
+  border-bottom: 1px solid var(--border); flex: 0 0 auto;
+}
+.pb-item { display: flex; flex-direction: column; gap: 3px; }
+.pb-k { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.q-official {
+  margin-left: 6px; padding: 1px 5px; border-radius: 4px; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.12em; color: var(--bg); background: var(--green); vertical-align: middle;
+}
+.pb-v { font-size: 16px; font-weight: 800; font-family: var(--mono); }
+.pb-v.sb { color: var(--purple); }
+.pb-v.mono { font-size: 13px; color: var(--text-dim); }
+
+/* Tyre compound pill */
+.tyre-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--tyre); color: var(--tyre);
+  font-family: var(--mono); font-weight: 800; font-size: 11px;
+}
+.tyre-pill.sm { width: 18px; height: 18px; font-size: 10px; border-width: 1.5px; }
+
+/* Timesheet table */
+.ts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* Columns size to their content and the table left-packs; any spare panel width
+   is left as blank margin on the right rather than stretched between columns
+   (which pushed the numbers to cell edges and looked like broken alignment).
+   The .ts-scroll wrapper handles horizontal overflow on narrow screens. */
+.ts-table { width: auto; border-collapse: collapse; font-size: 13px; }
+.ts-drv { min-width: 120px; }
+.ts-table thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--bg-2);
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+  font-weight: 700; text-align: right; padding: 9px 10px; white-space: nowrap;
+}
+.ts-table thead th.ts-pos, .ts-table thead th.ts-drv { text-align: left; }
+.ts-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+.ts-table tbody tr:hover { background: var(--panel-strong); }
+.ts-pos { width: 30px; color: var(--muted); font-family: var(--mono); }
+.ts-drv { text-align: left; }
+.ts-drv-inner { display: inline-flex; align-items: center; gap: 8px; }
+.ts-drv .swatch { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.ts-num { text-align: right; font-family: var(--mono); }
+.ts-num.strong { font-weight: 800; color: var(--text); }
+.ts-num.dim { color: var(--text-dim); }
+.ts-num.sb { color: var(--purple); font-weight: 800; }
+.ts-empty td { opacity: 0.45; }
+
+/* Long runs: ranking list + selected-run detail, side by side */
+.lr { flex: 1 1 auto; display: flex; gap: 12px; min-height: 0; flex-wrap: wrap; }
+.lr-list { flex: 1 1 340px; }
+.lr-head {
+  display: flex; align-items: baseline; gap: 12px; padding: 12px 16px;
+  border-bottom: 1px solid var(--border); flex: 0 0 auto;
+}
+.lr-title { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-dim); }
+.lr-thresh { margin-left: auto; font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.lr-rows { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.lr-row {
+  display: grid; grid-template-columns: 10px 38px 20px 1fr auto auto auto;
+  align-items: center; gap: 9px; width: 100%; text-align: left;
+  background: transparent; border: 1px solid transparent; border-radius: 9px;
+  padding: 7px 9px; cursor: pointer; transition: all 0.15s ease;
+}
+.lr-row:hover { background: var(--panel-strong); }
+.lr-row.on { background: var(--panel-strong); border-color: var(--border-strong); }
+.lr-row .swatch { width: 10px; height: 10px; border-radius: 50%; }
+.lr-acr { font-weight: 800; font-size: 13px; }
+.lr-row .barwrap { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+.lr-row .barfill { height: 100%; border-radius: 3px; }
+.lr-avg { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.lr-avg.best { color: var(--accent); font-weight: 800; }
+.lr-deg { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 52px; text-align: right; }
+.lr-n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+/* Selected-run detail */
+.run-detail { flex: 1.3 1 380px; padding: 14px 16px; gap: 14px; }
+.rd-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 0 0 auto; }
+.rd-acr { font-weight: 800; font-size: 18px; }
+.rd-stats { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+.rd-stat { display: flex; flex-direction: column; gap: 2px; }
+.rd-k { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.rd-v { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+.rd-chart { position: relative; flex: 1 1 auto; min-height: 120px; }
+.rd-avgline { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--accent); opacity: 0.55; z-index: 1; }
+.rd-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 4px; }
+.rd-col { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 3px; }
+.rd-time { font-family: var(--mono); font-size: 9px; color: var(--text-dim); height: 11px; }
+.rd-bar { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; min-height: 3px; transition: height 0.2s ease; }
+.rd-bar.excl { opacity: 0.5; }
+.rd-lap { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+.rd-legend { display: flex; gap: 16px; flex-wrap: wrap; flex: 0 0 auto; font-size: 10px; color: var(--muted); }
+.rd-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.rd-legend .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+.rd-avgline-key { width: 14px; border-top: 1px dashed var(--accent); }
+.rd-toggle { margin-left: 12px; }
+.rd-toggle button { padding: 4px 10px; font-size: 10px; }
+/* Average pace spelled out just above the dotted line in the graph view. */
+.rd-avglabel {
+  position: absolute; left: 0; margin-bottom: 2px; z-index: 2;
+  font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent);
+  background: rgba(0, 0, 0, 0.35); padding: 1px 6px; border-radius: 5px;
+}
+/* Per-lap table (the default long-run detail view). */
+.rd-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.rd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rd-table thead th {
+  position: sticky; top: 0; background: var(--panel); z-index: 1;
+  text-align: left; padding: 6px 10px; font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.rd-table tbody td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.rd-table tbody tr:hover { background: var(--panel-strong); }
+.rd-t-lap { width: 48px; font-family: var(--mono); color: var(--muted); }
+.rd-t-time { font-family: var(--mono); font-weight: 800; }
+.rd-t-note { color: var(--text-dim); font-size: 11px; text-transform: capitalize; }
+.rd-table tr.excl td { opacity: 0.5; }
+.rd-table tr.excl .rd-t-time { color: var(--text-dim); font-weight: 600; }
+.rd-avg-row td {
+  border-top: 1px solid var(--border-strong); border-bottom: none;
+  background: var(--panel-strong); font-weight: 800;
+}
+.rd-avg-row .rd-t-lap { color: var(--accent); font-size: 15px; }
+.rd-avg-row .rd-t-time { color: var(--accent); }
+.rd-avg-row .rd-t-note { color: var(--muted); opacity: 1; text-transform: none; }
+
+/* -------------------------------------------------------------------------
+   Long-run comparison: driver toggle chips, then a grouped-by-driver bar
+   chart or a row of per-driver lap tables with the ± include/exclude control.
+   ------------------------------------------------------------------------- */
+.lr > .panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 12px; }
+.lrc-modetoggle { margin-left: 12px; }
+.lrc-modetoggle button { padding: 4px 10px; font-size: 10px; }
+
+.lrc-toggles { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+.lrc-chip { gap: 6px; }
+
+/* Graph: one bar block per driver, side by side on a shared vertical scale. */
+.lrc-chart { position: relative; flex: 1 1 auto; min-height: 160px; }
+.lrc-fastline { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--accent); opacity: 0.5; z-index: 1; }
+.lrc-groups { position: absolute; inset: 0; display: flex; align-items: stretch; gap: 16px; overflow-x: auto; padding-bottom: 2px; }
+.lrc-group { flex: 1 1 0; min-width: 88px; display: flex; flex-direction: column; gap: 6px; }
+.lrc-bars { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 3px; min-height: 0; }
+.lrc-bar {
+  flex: 1 1 0; max-width: 22px; border-radius: 3px 3px 0 0; min-height: 2px; padding: 0;
+  border: none; appearance: none; cursor: pointer; transition: height 0.2s ease, filter 0.15s ease;
+}
+.lrc-bar:hover { filter: brightness(1.25); }
+.lrc-bar.excl { opacity: 0.45; }
+.lrc-bar.excl:hover { opacity: 0.7; }
+.lrc-group-foot { display: flex; align-items: baseline; gap: 8px; border-top: 1px solid var(--border); padding-top: 5px; }
+.lrc-group-acr { font-weight: 800; font-size: 13px; }
+.lrc-group-avg { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.lrc-group-deg { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-left: auto; }
+
+/* Table: side-by-side per-driver lap tables with the ± include/exclude control. */
+.lrc-tables { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; gap: 14px; align-items: flex-start; }
+.lrc-table { flex: 0 0 auto; min-width: 218px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.lrc-table-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel-strong); border-bottom: 1px solid var(--border); }
+.lrc-table-acr { font-weight: 800; font-size: 14px; }
+.lrc-table-stat { font-family: var(--mono); font-size: 12px; }
+.lrc-table-stat.dim { color: var(--muted); margin-left: auto; }
+.lrc-rd-table { font-size: 12px; }
+.lrc-t-act { width: 30px; text-align: center; }
+.lrc-tog {
+  width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--border-strong);
+  background: var(--panel); color: var(--text-dim); font-weight: 800; line-height: 1; cursor: pointer;
+}
+.lrc-tog:hover { background: var(--panel-strong); }
+.lrc-tog.in { color: var(--green); border-color: rgba(57, 211, 83, 0.4); }
+.lrc-tog.out { color: var(--muted); }
+
+.lrc-hint { color: var(--muted); font-style: italic; }
+.rd-legend .dot.on { background: var(--accent); opacity: 1; }
+
+/* -------------------------------------------------------------------------
+   Qualifying view (Qualifying sessions only): the knockout grid with the
+   elimination lines + drop-zone bubble, and sectors / teammate head-to-head.
+   Reuses the .practice / .ts-table / .pb- scaffolding above; only the
+   knockout-specific colouring lives here. ------------------------------- */
+.quali .q-cuts { margin-left: auto; }
+
+.q-table .q-row.q-out td { color: var(--text-dim); }
+.q-table .q-row.q-out .ts-num.strong { color: var(--text-dim); }
+/* Tint the left edge of each row by zone so the grid reads at a glance. */
+.q-table .q-row td:first-child { border-left: 3px solid transparent; }
+.q-table .q-row.q-pole td:first-child { border-left-color: var(--green); }
+.q-table .q-row.q-q2 td:first-child { border-left-color: var(--accent-2); }
+.q-table .q-row.q-out td:first-child { border-left-color: var(--red); }
+.q-table .q-row.q-bubble { background: rgba(255, 210, 63, 0.07); }
+.q-table .q-row.q-bubble:hover { background: rgba(255, 210, 63, 0.12); }
+
+.q-divider td {
+  padding: 5px 10px !important;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--muted);
+  background: var(--panel-strong);
+  border-bottom: 1px solid var(--border-strong) !important;
+}
+.q-divider-q2 td { color: var(--accent-2); }
+.q-divider-out td { color: var(--red); }
+
+.q-safe { color: var(--green); font-weight: 700; }
+.q-deficit { color: var(--red); font-weight: 700; }
+.q-battle { display: inline-flex; align-items: center; gap: 6px; }
+.q-battle-sep { color: var(--muted); font-size: 11px; }
+
+/* Sectors & H2H */
+.q-sectors { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+.q-kings-panel { flex: 0 0 auto; }
+.q-kings { display: flex; gap: 10px; flex-wrap: wrap; }
+.q-king {
+  flex: 1 1 120px; display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-strong);
+}
+.q-king-tag { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.q-king-time { font-size: 18px; font-weight: 800; font-family: var(--mono); }
+.q-king-drv { font-size: 13px; font-weight: 800; }
+.q-king-ideal { flex: 1 1 180px; }
+
+.q-h2h { flex: 0 0 auto; }
+.q-h2h-rows { display: flex; flex-direction: column; gap: 4px; padding: 8px; }
+.q-h2h-row {
+  display: grid; grid-template-columns: 12px 38px 1fr 38px 64px; align-items: center; gap: 10px;
+  padding: 5px 6px; border-radius: 8px;
+}
+.q-h2h-row:hover { background: var(--panel-strong); }
+.q-h2h-row .swatch { width: 10px; height: 10px; border-radius: 50%; }
+.q-h2h-faster { font-weight: 800; font-size: 13px; }
+.q-h2h-slower { font-weight: 700; font-size: 13px; color: var(--text-dim); }
+.q-h2h-bar { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+.q-h2h-fill { display: block; height: 100%; border-radius: 3px; opacity: 0.85; }
+.q-h2h-delta { font-size: 12px; color: var(--text-dim); text-align: right; }

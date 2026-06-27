@@ -11,12 +11,15 @@ import { NoticeStack } from './components/NoticeStack'
 import { LiveEntryChoice } from './components/LiveEntryChoice'
 import { Home } from './components/Home'
 import { useRaceNotices } from './hooks/useRaceNotices'
+import { useKeepAwake } from './hooks/useKeepAwake'
 import { DriverFocus } from './components/DriverFocus'
 import type { AppSettings } from './components/SettingsDrawer'
 import { TrackMap } from './components/views/TrackMap'
 import { GapChart } from './components/views/GapChart'
 import { Telemetry } from './components/views/Telemetry'
 import { StrategySection } from './components/views/StrategySection'
+import { PracticeView } from './components/views/PracticeView'
+import { QualifyingView } from './components/views/QualifyingView'
 import { RaceControlView } from './components/views/RaceControlView'
 import { TrackStatus } from './components/TrackStatus'
 import { useRaceData, type ActiveView, type SimLive } from './store/useRaceData'
@@ -89,6 +92,8 @@ export default function App() {
   const [trackAlerts, setTrackAlerts] = useState(initial.trackAlerts)
   const [activeView, setActiveView] = useState<ActiveView>(initial.activeView)
   const gapSeeded = useRef<string | null>(null)
+  const practiceSeeded = useRef<string | null>(null)
+  const qualiSeeded = useRef<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [focusDriver, setFocusDriver] = useState<number | null>(null)
   // Spoiler-safe entry prompt for in-progress races (start-from-beginning vs live).
@@ -153,6 +158,28 @@ export default function App() {
     }
   }, [snapshot, sessionId])
 
+  // Practice and Qualifying each get their own session-specific page. Open it by
+  // default once per session, and never strand its view on a session where the
+  // tab is hidden (the view must move back to Timing too).
+  const sessionType = snapshot?.race.sessionType ?? ''
+  useEffect(() => {
+    if (!snapshot) return
+    const type = sessionType.toLowerCase()
+    const isPractice = type.includes('practice')
+    const isQualifying = type.includes('qualifying')
+    // Reset a leftover special view when its tab no longer applies.
+    if (!isPractice && activeView === 'practice') setActiveView('timing')
+    if (!isQualifying && activeView === 'qualifying') setActiveView('timing')
+    if (isPractice && practiceSeeded.current !== sessionId) {
+      practiceSeeded.current = sessionId
+      setActiveView('practice')
+    }
+    if (isQualifying && qualiSeeded.current !== sessionId) {
+      qualiSeeded.current = sessionId
+      setActiveView('qualifying')
+    }
+  }, [snapshot, sessionType, sessionId, activeView])
+
   // Live alerts: fastest laps/sectors always; race-control + radio popups only
   // for drivers the user opted into. The full record stays in the Race Control
   // tab. Reset per session.
@@ -189,35 +216,10 @@ export default function App() {
     }
   }, [lapWindow, selected, activeView, notify, trackAlerts])
 
-  // Keep the screen awake while the app is open — it's meant to sit on an iPad
-  // through a whole session. The browser drops the lock on tab-switch / sleep,
-  // so we re-acquire it whenever the tab returns to the foreground.
-  useEffect(() => {
-    interface WakeLockSentinelLike { release: () => Promise<void> }
-    const nav = navigator as Navigator & {
-      wakeLock?: { request: (type: 'screen') => Promise<WakeLockSentinelLike> }
-    }
-    if (!nav.wakeLock) return
-    let lock: WakeLockSentinelLike | null = null
-    let cancelled = false
-    const acquire = async () => {
-      try {
-        lock = await nav.wakeLock!.request('screen')
-      } catch {
-        /* needs a user gesture or unsupported — ignore */
-      }
-    }
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && !cancelled) acquire()
-    }
-    acquire()
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisible)
-      lock?.release().catch(() => {})
-    }
-  }, [])
+  // Keep the screen awake while a session is loaded — it's meant to sit on an
+  // iPad through a whole session. Uses nosleep.js (Wake Lock where available,
+  // muted-video fallback on iOS Safari where the Wake Lock API doesn't hold).
+  useKeepAwake(selection != null)
 
   const toggleFocus = (n: number) => setFocusDriver((prev) => (prev === n ? null : n))
 
@@ -268,6 +270,28 @@ export default function App() {
     }
 
     switch (activeView) {
+      case 'practice':
+        return (
+          <div className="viewbody">
+            <PracticeView
+              drivers={snapshot.drivers}
+              stints={snapshot.stints}
+              sessionName={snapshot.race.sessionName}
+            />
+          </div>
+        )
+      case 'qualifying':
+        return (
+          <div className="viewbody">
+            <QualifyingView
+              drivers={snapshot.drivers}
+              stints={snapshot.stints}
+              sessionName={snapshot.race.sessionName}
+              qualifyingResult={snapshot.qualifyingResult}
+              qualifyingSegments={replay?.qualifyingSegments ?? null}
+            />
+          </div>
+        )
       case 'timing':
         return (
           <div className={`body single ${focusDriver != null ? 'with-focus' : ''}`}>
@@ -381,9 +405,17 @@ export default function App() {
         active={activeView}
         onChange={setActiveView}
         onHome={goHome}
+        sessionType={sessionType}
       />
 
-      {replay && <ReplayBar replay={replay} currentLap={snapshot?.race.currentLap ?? null} />}
+      {replay && (
+        <ReplayBar
+          replay={replay}
+          currentLap={snapshot?.race.currentLap ?? null}
+          sessionEnd={snapshot?.race.sessionEnd ?? null}
+          sessionType={sessionType}
+        />
+      )}
 
       <ErrorBoundary key={activeView} label="This view hit an error">
         {renderView()}
