@@ -89,8 +89,17 @@ export function Paywall({ onUnlock, onCancel }: Props) {
         </div>
 
         <p className="paywall-contact">
-          Then email <a href={`mailto:${CONTACT}`}>{CONTACT}</a> (your Ko-fi name or the receipt) and
-          I’ll reply with a key.
+          Then{' '}
+          <button
+            type="button"
+            className="paywall-maillink"
+            onClick={() => {
+              window.location.href = `mailto:${CONTACT}`
+            }}
+          >
+            email me
+          </button>{' '}
+          (your Ko-fi name or the receipt) and I’ll reply with a key.
         </p>
 
         <form className="paywall-form" onSubmit={submit}>
