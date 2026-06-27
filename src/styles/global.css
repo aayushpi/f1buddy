@@ -2093,9 +2093,9 @@ button {
 .paywall-or { text-align: center; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 .paywall-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .paywall-logos { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-top: 6px; }
-.paywall-donor { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.paywall-donor { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .paywall-donor-link {
-  font-size: 12px; font-weight: 700; color: var(--accent); text-decoration: none; text-align: center;
+  font-size: 12px; font-weight: 700; color: var(--accent); text-decoration: none; text-align: left;
 }
 .paywall-donor-link:hover { text-decoration: underline; }
 .paywall-logo {
