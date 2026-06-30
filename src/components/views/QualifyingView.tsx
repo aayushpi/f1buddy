@@ -62,22 +62,21 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
 
 // ---- Mini-sector strip ----
 
-// OpenF1's marshalling-segment status codes → colour, matching the live-timing
-// legend: purple = overall fastest mini-sector, green = the driver's personal
-// best, yellow = on track but off those, pit/empty greyed.
+// OpenF1's marshalling-segment status codes → colour (per OpenF1's legend):
+//   2048 yellow (down on personal best), 2049 green (personal best),
+//   2051 purple (track best), 2064 pit lane, 0 / unknown not available.
 function miniColour(code: number): string {
   switch (code) {
     case 2051:
-    case 2052:
-      return 'var(--purple)' // overall (session) best
-    case 2050:
-      return 'var(--green)' // personal best
+      return 'var(--purple)' // track (session) best
     case 2049:
-      return '#ffce3a' // yellow: timed, not a best
+      return 'var(--green)' // personal best
+    case 2048:
+      return '#ffce3a' // yellow: down on personal best
     case 2064:
       return 'rgba(120, 134, 153, 0.45)' // pit lane
     default:
-      return 'rgba(255, 255, 255, 0.08)' // 0 / 2048 / unknown: not set
+      return 'rgba(255, 255, 255, 0.08)' // 0 / unknown: not available
   }
 }
 
@@ -106,9 +105,9 @@ function MiniSectors({
   return (
     <div className="panel practice-panel q-mini">
       <div className="qm-legend">
-        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> fastest overall</span>
+        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> track best</span>
         <span><i className="qm-key" style={{ background: 'var(--green)' }} /> personal best</span>
-        <span><i className="qm-key" style={{ background: '#ffce3a' }} /> on track</span>
+        <span><i className="qm-key" style={{ background: '#ffce3a' }} /> down on best</span>
         <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
         <span className="qm-note">Mini-sector colours from the timing feed — where the lap was won, not split times.</span>
       </div>
