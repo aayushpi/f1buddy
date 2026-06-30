@@ -13,7 +13,7 @@ export const CG_HERO_PATH =
 export function CardiogramMark({
   size = 32,
   className,
-  title = 'Cardiogram',
+  title = 'cardiogram',
 }: {
   size?: number
   className?: string

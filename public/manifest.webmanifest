@@ -1,6 +1,6 @@
 {
-  "name": "Cardiogram",
-  "short_name": "Cardiogram",
+  "name": "cardiogram",
+  "short_name": "cardiogram",
   "description": "Live F1 race-companion dashboard — the pulse of the race.",
   "start_url": "/",
   "display": "standalone",
