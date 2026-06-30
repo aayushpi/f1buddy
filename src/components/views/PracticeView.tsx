@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { DriverState, StintRow } from '../../api/types'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
 import { buildLongRuns, buildTimesheet, recountRun, type Run } from '../../utils/practice'
+import { buildMiniSectorRows } from '../../utils/qualifying'
+import { MiniSectorStrip } from '../MiniSectorStrip'
 
 interface Props {
   drivers: DriverState[]
@@ -47,6 +49,7 @@ export function PracticeView({ drivers, stints, sessionName }: Props) {
 
 function QualiSims({ drivers, stints }: { drivers: DriverState[]; stints: StintRow[] }) {
   const sheet = useMemo(() => buildTimesheet(drivers, stints), [drivers, stints])
+  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers).map((r) => [r.driverNumber, r])), [drivers])
   const fastest = sheet.rows.find((r) => r.bestLap != null)
 
   const sectorClass = (val: number | null, sessionBest: number | null) =>
@@ -97,6 +100,7 @@ function QualiSims({ drivers, stints }: { drivers: DriverState[]; stints: StintR
               <th className="ts-num">Ideal</th>
               <th className="ts-num">Trap</th>
               <th className="ts-num">Laps</th>
+              <th className="ts-mini">Mini-sectors</th>
             </tr>
           </thead>
           <tbody>
@@ -129,6 +133,12 @@ function QualiSims({ drivers, stints }: { drivers: DriverState[]; stints: StintR
                 <td className="ts-num dim">{formatLapTime(r.idealLap)}</td>
                 <td className="ts-num dim">{r.speedTrap == null ? '—' : `${Math.round(r.speedTrap)}`}</td>
                 <td className="ts-num dim">{r.laps}</td>
+                <td className="ts-mini">
+                  {(() => {
+                    const s = strips.get(r.driverNumber)
+                    return <MiniSectorStrip s1={s?.s1 ?? []} s2={s?.s2 ?? []} s3={s?.s3 ?? []} />
+                  })()}
+                </td>
               </tr>
             ))}
           </tbody>

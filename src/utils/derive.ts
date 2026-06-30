@@ -483,6 +483,9 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
           s3: l.duration_sector_3,
           pitOut: l.is_pit_out_lap,
           date: Number.isFinite(d) ? d : null,
+          seg1: l.segments_sector_1,
+          seg2: l.segments_sector_2,
+          seg3: l.segments_sector_3,
         }
       })
     const avgLapTime = lapTimes.length

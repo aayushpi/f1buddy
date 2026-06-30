@@ -211,6 +211,12 @@ export interface LapDetail {
   // Epoch ms the lap started (null if the feed has no start time). Lets the
   // qualifying view bucket each lap into its Q1/Q2/Q3 window.
   date: number | null
+  // Per-mini-sector status codes for each sector (the marshalling "segments"
+  // OpenF1 exposes — purple/green/yellow/pit, not times). Drives the qualifying
+  // mini-sector strip. Null when the feed didn't carry them for this lap.
+  seg1: number[] | null
+  seg2: number[] | null
+  seg3: number[] | null
 }
 
 export interface DriverState {
