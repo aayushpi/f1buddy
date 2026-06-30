@@ -3,6 +3,7 @@ import type { DriverState, QualifyingClassification, StintRow } from '../../api/
 import type { QualiSegment } from '../../utils/derive'
 import { compoundColor, compoundLabel, formatDelta, formatLapTime, formatSector } from '../../utils/format'
 import { buildMiniSectorRows, buildQualifying, teammatePairs, type QualiRow, type Zone } from '../../utils/qualifying'
+import { MiniSectorStrip } from '../MiniSectorStrip'
 
 interface Props {
   drivers: DriverState[]
@@ -62,24 +63,6 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
 
 // ---- Mini-sector strip ----
 
-// OpenF1's marshalling-segment status codes → colour (per OpenF1's legend):
-//   2048 yellow (down on personal best), 2049 green (personal best),
-//   2051 purple (track best), 2064 pit lane, 0 / unknown not available.
-function miniColour(code: number): string {
-  switch (code) {
-    case 2051:
-      return 'var(--purple)' // track (session) best
-    case 2049:
-      return 'var(--green)' // personal best
-    case 2048:
-      return '#ffce3a' // yellow: down on personal best
-    case 2064:
-      return 'rgba(120, 134, 153, 0.45)' // pit lane
-    default:
-      return 'rgba(255, 255, 255, 0.08)' // 0 / unknown: not available
-  }
-}
-
 function MiniSectors({
   drivers,
   stints,
@@ -122,15 +105,7 @@ function MiniSectors({
               <span className="qm-drv" style={{ color: r.colour }}>{r.acronym}</span>
               <span className="qm-lap">{formatLapTime(r.bestLap)}</span>
               <span className="qm-gap">{r.position === 1 || gap == null ? '' : formatDelta(gap)}</span>
-              <span className="qm-strip">
-                {[strip?.s1 ?? [], strip?.s2 ?? [], strip?.s3 ?? []].map((seg, si) => (
-                  <span key={si} className="qm-seg">
-                    {seg.map((code, ci) => (
-                      <i key={ci} className="qm-cell" style={{ background: miniColour(code) }} />
-                    ))}
-                  </span>
-                ))}
-              </span>
+              <MiniSectorStrip s1={strip?.s1 ?? []} s2={strip?.s2 ?? []} s3={strip?.s3 ?? []} />
             </div>
           )
         })}

@@ -2571,6 +2571,10 @@ button {
 .qm-strip { flex: 1 1 auto; display: flex; gap: 6px; min-width: 0; }
 .qm-seg { flex: 1 1 0; display: flex; gap: 1px; }
 .qm-cell { flex: 1 1 0; height: 16px; border-radius: 2px; min-width: 2px; }
+/* Mini-sector strip inside the Quali Sims timesheet: give the column room and
+   let the strip fill it. */
+.ts-mini { min-width: 220px; }
+.ts-mini .qm-strip { width: 100%; }
 
 .q-divider td {
   padding: 5px 10px !important;
