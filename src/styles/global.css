@@ -712,9 +712,13 @@ button {
   flex: 1 1 auto;
   display: flex;
   min-height: 0;
+  min-width: 0;
   gap: 12px;
 }
-.viewbody > * { flex: 1 1 auto; min-height: 0; }
+/* min-width:0 lets inner overflow:auto regions (wide tables, the long-run
+   comparison) scroll within their own box instead of stretching the whole view
+   past a narrow (phone) viewport. */
+.viewbody > * { flex: 1 1 auto; min-height: 0; min-width: 0; }
 
 /* Telemetry section now stacks car telemetry + lap-time analysis, sharing one
    driver selector. */
@@ -2324,12 +2328,21 @@ button {
   .picker-years { margin-left: 0; }
   .picker-grid { grid-template-columns: 1fr 1fr; }
   .picker-sessions { grid-template-columns: 1fr 1fr; }
+
+  /* ---- Long-run comparison: tidy header + roomier graph groups ---- */
+  .lr-head { flex-wrap: wrap; align-items: center; }
+  .lrc-modetoggle { margin-left: auto; }
+  .lr-thresh { flex-basis: 100%; margin-left: 0; order: 5; }
+  .lrc-group { min-width: 76px; }
+  .lrc-group-foot { flex-wrap: wrap; gap: 1px 6px; }
+  .lrc-group-deg { margin-left: 0; }
 }
 
 /* ============================================================
    Free Practice view (P1/P2/P3 only): quali-sim timesheet + long runs.
    ============================================================ */
-.practice { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.practice { flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+.practice-panel { min-width: 0; }
 .practice-head { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
 .practice-subtabs { align-self: flex-start; }
 .practice-session {
@@ -2405,7 +2418,7 @@ button {
 .ts-empty td { opacity: 0.45; }
 
 /* Long runs: ranking list + selected-run detail, side by side */
-.lr { flex: 1 1 auto; display: flex; gap: 12px; min-height: 0; flex-wrap: wrap; }
+.lr { flex: 1 1 auto; display: flex; gap: 12px; min-height: 0; min-width: 0; flex-wrap: wrap; }
 .lr-list { flex: 1 1 340px; }
 .lr-head {
   display: flex; align-items: baseline; gap: 12px; padding: 12px 16px;
@@ -2486,7 +2499,7 @@ button {
    Long-run comparison: driver toggle chips, then a grouped-by-driver bar
    chart or a row of per-driver lap tables with the ± include/exclude control.
    ------------------------------------------------------------------------- */
-.lr > .panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; gap: 12px; }
+.lr > .panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 16px; gap: 12px; }
 .lrc-modetoggle { margin-left: 12px; }
 .lrc-modetoggle button { padding: 4px 10px; font-size: 10px; }
 
