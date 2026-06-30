@@ -94,7 +94,7 @@ the redesign should keep these elements (restyle freely; don't remove function):
    - **Loading / offline:** spinner / "Couldn't reach OpenF1."
 3. **Two action buttons:**
    - **"Replay the last race"** (+ last GP name)
-   - **"Load a past session"** (+ "Browse every Grand Prix, 2023–2026")
+   - **"Load a past session"** (+ "Revisit past F1 sessions")
 4. **Footer:** "Powered by the OpenF1 API · made by Aayush" (links to aayush.fyi).
 
 **Goals for the redesign**

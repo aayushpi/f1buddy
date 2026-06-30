@@ -118,7 +118,6 @@ export function GapChart({ drivers, selected, onToggle, raceControl }: Props) {
     <div className="gap-header">
       <div>
         <div className="gap-title">Gap to Leader</div>
-        <div className="gap-sub">Gap to the race leader, lap by lap — toggle drivers below</div>
       </div>
     </div>
   )
