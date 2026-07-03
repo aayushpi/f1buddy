@@ -167,7 +167,16 @@ function Knockout({
         </div>
         <div className="pb-item">
           <span className="pb-k">Theoretical pole</span>
-          <span className="pb-v sb">{formatLapTime(report.theoreticalBest)}</span>
+          <span className="pb-v sb">
+            {report.theoreticalBest ? (
+              <>
+                {formatLapTime(report.theoreticalBest.time)}{' '}
+                <span style={{ color: report.theoreticalBest.colour }}>({report.theoreticalBest.acronym})</span>
+              </>
+            ) : (
+              '—'
+            )}
+          </span>
         </div>
         {report.eliminatedPerSegment > 0 && (
           <>
@@ -334,8 +343,14 @@ function Sectors({
           ))}
           <div className="q-king q-king-ideal">
             <span className="q-king-tag">Theoretical pole</span>
-            <span className="q-king-time sb">{formatLapTime(report.theoreticalBest)}</span>
-            <span className="q-king-drv dim">sum of best sectors</span>
+            <span className="q-king-time sb">{formatLapTime(report.theoreticalBest?.time ?? null)}</span>
+            <span
+              className="q-king-drv"
+              style={{ color: report.theoreticalBest?.colour }}
+              title="Fastest driver's own best sectors strung together"
+            >
+              {report.theoreticalBest ? report.theoreticalBest.acronym : '—'}
+            </span>
           </div>
         </div>
       </div>

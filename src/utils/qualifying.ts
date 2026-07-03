@@ -22,7 +22,7 @@
 import type { DriverState, LapDetail, QualifyingClassification, StintRow } from '../api/types'
 import type { QualiSegment } from './derive'
 import { teamHex } from './format'
-import { buildTimesheet, type SectorBests, type TimesheetRow } from './practice'
+import { buildTimesheet, type SectorBests, type TheoreticalBest, type TimesheetRow } from './practice'
 
 // Which side of the elimination lines a car currently sits on.
 //   'pole' — provisionally into the top-10 pole shootout (Q3).
@@ -50,7 +50,7 @@ export interface QualiRow extends TimesheetRow {
 export interface QualifyingReport {
   rows: QualiRow[]
   sessionBest: SectorBests
-  theoreticalBest: number | null
+  theoreticalBest: TheoreticalBest | null
   // True when the order is the official FIA classification (Q1/Q2/Q3 times),
   // rather than a provisional best-lap timesheet that evolves with the clock.
   official: boolean
