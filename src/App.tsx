@@ -298,7 +298,7 @@ export default function App() {
             <div className="col">
               <TimingTower
                 drivers={snapshot.drivers}
-                fastestDriver={snapshot.fastestLap?.driverNumber ?? null}
+                fastestLapTime={snapshot.fastestLap?.time ?? null}
                 focused={focusDriver}
                 onFocus={toggleFocus}
               />

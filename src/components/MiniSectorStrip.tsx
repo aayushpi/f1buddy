@@ -1,5 +1,5 @@
 // A driver's lap drawn as coloured marshalling segments (mini-sectors), shared
-// by the Qualifying "Mini Sectors" tab and the practice Quali Sims timesheet.
+// by the Qualifying Knockout timing table and the practice Quali Sims timesheet.
 //
 // OpenF1 exposes the segment *status colours*, not per-mini-sector times. Per
 // OpenF1's legend: 2048 yellow (down on personal best), 2049 green (personal

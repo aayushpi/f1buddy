@@ -5,26 +5,30 @@ import { TyreBadge } from './TyreBadge'
 import { SectorLights } from './SectorLights'
 import { RowSparkline } from './RowSparkline'
 
-function lapClass(d: DriverState): string {
+// Colour the *last lap* only for what it actually is: purple when the last lap
+// is (equals) the session's fastest lap — the driver just set the overall best
+// on it, not merely owns the fastest from an earlier lap — green when it's the
+// driver's own personal best. Anything else stays uncoloured.
+function lapClass(d: DriverState, fastestLapTime: number | null): string {
   if (d.lastLap == null) return ''
+  if (fastestLapTime != null && d.lastLap <= fastestLapTime + 0.0005) return 'fastest'
   if (d.bestLap != null && d.lastLap <= d.bestLap + 0.0005) return 'personal'
   return ''
 }
 
 function Row({
   d,
-  fastestDriver,
+  fastestLapTime,
   focused,
   onFocus,
 }: {
   d: DriverState
-  fastestDriver: number | null
+  fastestLapTime: number | null
   focused: number | null
   onFocus: (n: number) => void
 }) {
   const team = teamHex(d.teamColour)
-  const isFastLap = fastestDriver === d.driverNumber && d.lastLap != null
-  const lapCls = isFastLap ? 'fastest' : lapClass(d)
+  const lapCls = lapClass(d, fastestLapTime)
   const lappedLeader = typeof d.gapToLeader === 'string'
 
   return (
@@ -70,12 +74,12 @@ function Row({
 
 export function TimingTower({
   drivers,
-  fastestDriver,
+  fastestLapTime,
   focused,
   onFocus,
 }: {
   drivers: DriverState[]
-  fastestDriver: number | null
+  fastestLapTime: number | null
   focused: number | null
   onFocus: (n: number) => void
 }) {
@@ -107,7 +111,7 @@ export function TimingTower({
             <Row
               key={d.driverNumber}
               d={d}
-              fastestDriver={fastestDriver}
+              fastestLapTime={fastestLapTime}
               focused={focused}
               onFocus={onFocus}
             />

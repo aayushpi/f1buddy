@@ -329,26 +329,36 @@ export interface MiniSectorRow {
 }
 
 /**
- * Each driver's best lap rendered as its mini-sector status codes, fastest lap
- * first — the data behind the qualifying mini-sector strip. OpenF1 gives the
- * marshalling-segment colours (purple/green/yellow/pit), not per-mini-sector
- * times, so this is a *where-on-track* read, not a numeric split.
+ * Each driver rendered as its mini-sector status codes — the data behind the
+ * mini-sector strip. OpenF1 gives the marshalling-segment colours
+ * (purple/green/yellow/pit), not per-mini-sector times, so this is a
+ * *where-on-track* read, not a numeric split. Rows come out fastest-lap first.
+ *
+ * `lap` chooses which lap the strip is drawn from:
+ *   - 'best'    — the driver's fastest lap (where their benchmark was won/lost).
+ *   - 'current' — the most recent lap carrying segment data (the lap on track
+ *     right now under the replay clock), so the timing screen shows live
+ *     mini-sectors as they light up. Falls back to the best lap if the latest
+ *     laps have no segment data.
  */
-export function buildMiniSectorRows(drivers: DriverState[]): MiniSectorRow[] {
+export function buildMiniSectorRows(drivers: DriverState[], lap: 'best' | 'current' = 'best'): MiniSectorRow[] {
+  const hasSeg = (l: LapDetail) => !!(l.seg1?.length || l.seg2?.length || l.seg3?.length)
   const rows: MiniSectorRow[] = drivers.map((d) => {
     let best: LapDetail | null = null
+    let current: LapDetail | null = null
     for (const l of d.lapHistory) {
-      if (l.time == null || !Number.isFinite(l.time)) continue
-      if (best == null || l.time < best.time!) best = l
+      if (l.time != null && Number.isFinite(l.time) && (best == null || l.time < best.time!)) best = l
+      if (hasSeg(l) && (current == null || l.lap > current.lap)) current = l
     }
+    const strip = lap === 'current' ? (current ?? best) : best
     return {
       driverNumber: d.driverNumber,
       acronym: d.acronym,
       colour: teamHex(d.teamColour),
       bestLap: best?.time ?? null,
-      s1: best?.seg1 ?? [],
-      s2: best?.seg2 ?? [],
-      s3: best?.seg3 ?? [],
+      s1: strip?.seg1 ?? [],
+      s2: strip?.seg2 ?? [],
+      s3: strip?.seg3 ?? [],
     }
   })
   rows.sort((a, b) => {
