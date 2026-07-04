@@ -406,25 +406,26 @@ button {
 .stint-cell { text-align: center; font-family: var(--mono); font-size: 13px; }
 .stint-cell .unit { font-size: 9px; color: var(--muted); margin-left: 1px; }
 
-/* Sectors — clean: a coloured bar + time, no box border/background. */
+/* Sectors — each sector is its mini-sector strip (where the sector is being
+   won on track) over a bar coloured by the sector's overall speed. */
 .sectors { display: flex; gap: 5px; justify-content: center; }
 .sector {
   flex: 1;
-  max-width: 38px;
+  max-width: 42px;
   height: 30px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  gap: 3px;
 }
-.sector .bar { width: 70%; height: 3px; border-radius: 2px; background: var(--muted); margin-bottom: 3px; }
-.sector .t { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+.sector-mini { display: flex; gap: 1px; height: 8px; }
+.sector-mini .mini-cell { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: rgba(255, 255, 255, 0.08); }
+.sector-mini .mini-empty { background: rgba(255, 255, 255, 0.05); }
+.sector .bar { width: 100%; height: 3px; border-radius: 2px; background: var(--muted); }
 .sector.fastest .bar { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
-.sector.fastest .t { color: #e9c6ff; }
 .sector.personal .bar { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.sector.personal .t { color: #b6f5d2; }
 .sector.normal .bar { background: var(--yellow); }
-.sector.normal .t { color: var(--text-dim); }
 
 .laptime { text-align: center; font-family: var(--mono); font-size: 14px; font-weight: 600; }
 .laptime.fastest { color: var(--purple); text-shadow: 0 0 10px rgba(192, 75, 255, 0.5); }

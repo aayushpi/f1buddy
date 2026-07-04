@@ -466,7 +466,13 @@ export function buildSnapshot(raw: RawData, lapWindow: number): RaceSnapshot {
           : i === 1
             ? (latestLapRecord?.duration_sector_2 ?? null)
             : (latestLapRecord?.duration_sector_3 ?? null)
-      return { time: t, perf: classifySector(t, driverBest[i], overallSector[i]) }
+      const seg =
+        i === 0
+          ? (latestLapRecord?.segments_sector_1 ?? [])
+          : i === 1
+            ? (latestLapRecord?.segments_sector_2 ?? [])
+            : (latestLapRecord?.segments_sector_3 ?? [])
+      return { time: t, perf: classifySector(t, driverBest[i], overallSector[i]), seg }
     }) as [SectorState, SectorState, SectorState]
 
     const lapTimes = laps.slice(-lapWindow).map((l) => ({ lap: l.lap_number, time: l.lap_duration! }))

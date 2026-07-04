@@ -193,7 +193,12 @@ export type TrackStatus =
 
 export interface SectorState {
   time: number | null
+  // Overall speed of the sector on the latest lap (purple/green/normal).
   perf: SectorPerf
+  // Mini-sector marshalling status codes across this sector on the latest lap
+  // (the OpenF1 segments — where on track the sector is being won), so the
+  // timing screen can show mini-sectors while perf carries the overall speed.
+  seg: number[]
 }
 
 export interface LapPoint {
