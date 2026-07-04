@@ -23,9 +23,9 @@ type Sub = 'knockout' | 'sectors'
 /**
  * The Qualifying view. Two sub-tabs matching how a quali session reads:
  *   - Knockout: the provisional grid with the elimination lines drawn through
- *     it, the drop zone, the gap-to-the-cut bubble, and each car's live
- *     mini-sector strip alongside its timing — where on track the current lap
- *     is being won or lost.
+ *     it, the drop zone, the gap-to-the-cut bubble, and each car's best-lap
+ *     mini-sector strip alongside its timing — where on track that lap was won
+ *     or lost.
  *   - Sectors & H2H: where the lap time lives (sector kings, time left on the
  *     table) and the intra-team qualifying head-to-head.
  * Shown only for Qualifying sessions (gated by the caller).
@@ -79,10 +79,10 @@ function Knockout({
     () => buildQualifying(drivers, stints, official, segments),
     [drivers, stints, official, segments],
   )
-  // Live mini-sector strip per driver, drawn from the lap on track right now —
-  // shown inline with the timing so the knockout table doubles as the
-  // where-on-track read (previously a separate Mini Sectors tab).
-  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers, 'current').map((r) => [r.driverNumber, r])), [drivers])
+  // Mini-sector strip per driver, drawn from their best lap — shown inline with
+  // the timing so the knockout table doubles as the where-on-track read
+  // (previously a separate Mini Sectors tab).
+  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers).map((r) => [r.driverNumber, r])), [drivers])
   const hasLap = report.rows.some((r) => r.bestLap != null)
 
   // The two cars on each bubble, for the banner battle lines.
@@ -142,7 +142,7 @@ function Knockout({
         <span><i className="qm-key" style={{ background: 'var(--green)' }} /> personal best</span>
         <span><i className="qm-key" style={{ background: '#ffce3a' }} /> down on best</span>
         <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
-        <span className="qm-note">Mini-sectors from the timing feed on the current lap — where the lap is being won, not split times.</span>
+        <span className="qm-note">Mini-sectors from the timing feed on each driver's best lap — where the lap was won, not split times.</span>
       </div>
 
       <div className="ts-scroll">
