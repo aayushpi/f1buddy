@@ -22,7 +22,7 @@
 import type { DriverState, LapDetail, QualifyingClassification, StintRow } from '../api/types'
 import type { QualiSegment } from './derive'
 import { teamHex } from './format'
-import { buildTimesheet, type SectorBests, type TimesheetRow } from './practice'
+import { buildTimesheet, type SectorBests, type TheoreticalBest, type TimesheetRow } from './practice'
 
 // Which side of the elimination lines a car currently sits on.
 //   'pole' — provisionally into the top-10 pole shootout (Q3).
@@ -50,7 +50,7 @@ export interface QualiRow extends TimesheetRow {
 export interface QualifyingReport {
   rows: QualiRow[]
   sessionBest: SectorBests
-  theoreticalBest: number | null
+  theoreticalBest: TheoreticalBest | null
   // True when the order is the official FIA classification (Q1/Q2/Q3 times),
   // rather than a provisional best-lap timesheet that evolves with the clock.
   official: boolean
@@ -329,10 +329,14 @@ export interface MiniSectorRow {
 }
 
 /**
- * Each driver's best lap rendered as its mini-sector status codes, fastest lap
- * first — the data behind the qualifying mini-sector strip. OpenF1 gives the
- * marshalling-segment colours (purple/green/yellow/pit), not per-mini-sector
- * times, so this is a *where-on-track* read, not a numeric split.
+ * Each driver's fastest lap rendered as its mini-sector status codes — the data
+ * behind the mini-sector strip. OpenF1 gives the marshalling-segment colours
+ * (purple/green/yellow/pit), not per-mini-sector times, so this is a
+ * *where-on-track* read, not a numeric split. Rows come out fastest-lap first.
+ *
+ * The strip is drawn from the driver's *best* lap — the lap that earns their
+ * timesheet position — so a session-leading lap shows its green/purple sectors,
+ * not the yellow of whatever cool-down or in-lap they happen to be on now.
  */
 export function buildMiniSectorRows(drivers: DriverState[]): MiniSectorRow[] {
   const rows: MiniSectorRow[] = drivers.map((d) => {

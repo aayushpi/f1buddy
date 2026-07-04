@@ -73,7 +73,16 @@ function QualiSims({ drivers, stints }: { drivers: DriverState[]; stints: StintR
         </div>
         <div className="pb-item">
           <span className="pb-k">Theoretical best</span>
-          <span className="pb-v sb">{formatLapTime(sheet.theoreticalBest)}</span>
+          <span className="pb-v sb">
+            {sheet.theoreticalBest ? (
+              <>
+                {formatLapTime(sheet.theoreticalBest.time)}{' '}
+                <span style={{ color: sheet.theoreticalBest.colour }}>({sheet.theoreticalBest.acronym})</span>
+              </>
+            ) : (
+              '—'
+            )}
+          </span>
         </div>
         <div className="pb-item">
           <span className="pb-k">Ideal sectors</span>

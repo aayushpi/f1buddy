@@ -43,6 +43,13 @@ body,
   margin: 0;
 }
 
+/* Base colour behind everything, so the iOS safe-area regions (status bar,
+   home indicator) show the app's dark background instead of white when the
+   app is launched standalone from the Home Screen with viewport-fit=cover. */
+html {
+  background: var(--bg-0);
+}
+
 body {
   font-family: var(--sans);
   color: var(--text);
@@ -74,7 +81,11 @@ button {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  /* Keep the 12px gutter, but add the device safe-area insets on top so the UI
+     clears the notch / status bar (top) and the home indicator (bottom) when
+     run standalone from the Home Screen. */
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
   gap: 12px;
 }
 
@@ -395,25 +406,26 @@ button {
 .stint-cell { text-align: center; font-family: var(--mono); font-size: 13px; }
 .stint-cell .unit { font-size: 9px; color: var(--muted); margin-left: 1px; }
 
-/* Sectors — clean: a coloured bar + time, no box border/background. */
+/* Sectors — each sector is its mini-sector strip (where the sector is being
+   won on track) over a bar coloured by the sector's overall speed. */
 .sectors { display: flex; gap: 5px; justify-content: center; }
 .sector {
   flex: 1;
-  max-width: 38px;
+  max-width: 42px;
   height: 30px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
+  gap: 3px;
 }
-.sector .bar { width: 70%; height: 3px; border-radius: 2px; background: var(--muted); margin-bottom: 3px; }
-.sector .t { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+.sector-mini { display: flex; gap: 1px; height: 8px; }
+.sector-mini .mini-cell { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: rgba(255, 255, 255, 0.08); }
+.sector-mini .mini-empty { background: rgba(255, 255, 255, 0.05); }
+.sector .bar { width: 100%; height: 3px; border-radius: 2px; background: var(--muted); }
 .sector.fastest .bar { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
-.sector.fastest .t { color: #e9c6ff; }
 .sector.personal .bar { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.sector.personal .t { color: #b6f5d2; }
 .sector.normal .bar { background: var(--yellow); }
-.sector.normal .t { color: var(--text-dim); }
 
 .laptime { text-align: center; font-family: var(--mono); font-size: 14px; font-weight: 600; }
 .laptime.fastest { color: var(--purple); text-shadow: 0 0 10px rgba(192, 75, 255, 0.5); }
@@ -531,7 +543,8 @@ button {
   background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
   border-left: 1px solid var(--border-strong);
   z-index: 41;
-  padding: 22px;
+  padding: calc(22px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-right, 0px))
+    calc(22px + env(safe-area-inset-bottom, 0px)) 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1878,7 +1891,10 @@ button {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: clamp(20px, 3.5vw, 44px) clamp(20px, 4vw, 48px);
+  padding: calc(clamp(20px, 3.5vw, 44px) + env(safe-area-inset-top, 0px))
+    calc(clamp(20px, 4vw, 48px) + env(safe-area-inset-right, 0px))
+    calc(clamp(20px, 3.5vw, 44px) + env(safe-area-inset-bottom, 0px))
+    calc(clamp(20px, 4vw, 48px) + env(safe-area-inset-left, 0px));
   overflow: hidden;
   background:
     radial-gradient(1200px 700px at 80% -10%, rgba(122, 107, 255, 0.12), transparent 60%),
@@ -2004,7 +2020,8 @@ button {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 18px 22px 22px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-right, 0px))
+    calc(22px + env(safe-area-inset-bottom, 0px)) calc(22px + env(safe-area-inset-left, 0px));
   gap: 16px;
   overflow: hidden;
 }

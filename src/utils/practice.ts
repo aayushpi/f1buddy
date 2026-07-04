@@ -37,12 +37,26 @@ export interface TimesheetRow {
   laps: number // number of timed laps completed
 }
 
+// The session's theoretical best lap and the driver who owns it. This is a real,
+// achievable lap — the fastest of every driver's *own* ideal lap — not an
+// impossible splice of different cars' purple sectors.
+export interface TheoreticalBest {
+  time: number
+  driverNumber: number
+  acronym: string
+  colour: string
+}
+
 export interface Timesheet {
   rows: TimesheetRow[]
   // Session-wide fastest sector times, for purple highlighting.
   sessionBest: SectorBests
-  // Theoretical best lap of the session = sum of the fastest sector anywhere.
-  theoreticalBest: number | null
+  // Theoretical best lap of the session: the fastest of every driver's own ideal
+  // lap (their best S1 + S2 + S3). Cars differ, so stitching the quickest sector
+  // from three different drivers is not a lap anyone could run — the honest
+  // "what if this car strung its best sectors together" is per driver, then take
+  // the best of those. Carries the driver so the view can name them.
+  theoreticalBest: TheoreticalBest | null
 }
 
 // ---- Long runs ----
@@ -187,10 +201,19 @@ export function buildTimesheet(drivers: DriverState[], stints: StintRow[]): Time
     s2: minOf(rows.map((r) => r.bestSectors.s2)),
     s3: minOf(rows.map((r) => r.bestSectors.s3)),
   }
-  const theoreticalBest =
-    sessionBest.s1 != null && sessionBest.s2 != null && sessionBest.s3 != null
-      ? sessionBest.s1 + sessionBest.s2 + sessionBest.s3
-      : null
+  // The best single driver's ideal lap: string every car's own best sectors into
+  // its own lap, then take the fastest of those laps (and remember whose it is).
+  let theoreticalBest: TheoreticalBest | null = null
+  for (const r of rows) {
+    if (r.idealLap != null && (theoreticalBest == null || r.idealLap < theoreticalBest.time)) {
+      theoreticalBest = {
+        time: r.idealLap,
+        driverNumber: r.driverNumber,
+        acronym: r.acronym,
+        colour: r.colour,
+      }
+    }
+  }
 
   let prevBest: number | null = null
   const out: TimesheetRow[] = rows.map((r, i) => {

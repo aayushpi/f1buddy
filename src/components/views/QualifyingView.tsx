@@ -18,28 +18,25 @@ interface Props {
   qualifyingSegments: QualiSegment[] | null
 }
 
-type Sub = 'mini' | 'knockout' | 'sectors'
+type Sub = 'knockout' | 'sectors'
 
 /**
- * The Qualifying view. Three sub-tabs matching how a quali session reads:
- *   - Mini Sectors: each driver's best lap as a coloured mini-sector strip —
- *     where on track the lap was won or lost.
+ * The Qualifying view. Two sub-tabs matching how a quali session reads:
  *   - Knockout: the provisional grid with the elimination lines drawn through
- *     it, the drop zone, and the gap-to-the-cut bubble.
+ *     it, the drop zone, the gap-to-the-cut bubble, and each car's best-lap
+ *     mini-sector strip alongside its timing — where on track that lap was won
+ *     or lost.
  *   - Sectors & H2H: where the lap time lives (sector kings, time left on the
  *     table) and the intra-team qualifying head-to-head.
  * Shown only for Qualifying sessions (gated by the caller).
  */
 export function QualifyingView({ drivers, stints, sessionName, qualifyingResult, qualifyingSegments }: Props) {
-  const [sub, setSub] = useState<Sub>('mini')
+  const [sub, setSub] = useState<Sub>('knockout')
 
   return (
     <div className="practice quali">
       <div className="practice-head">
         <div className="seg practice-subtabs">
-          <button className={sub === 'mini' ? 'active' : ''} onClick={() => setSub('mini')}>
-            Mini Sectors
-          </button>
           <button className={sub === 'knockout' ? 'active' : ''} onClick={() => setSub('knockout')}>
             Knockout
           </button>
@@ -50,67 +47,11 @@ export function QualifyingView({ drivers, stints, sessionName, qualifyingResult,
         <span className="practice-session">{sessionName}</span>
       </div>
 
-      {sub === 'mini' ? (
-        <MiniSectors drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
-      ) : sub === 'knockout' ? (
+      {sub === 'knockout' ? (
         <Knockout drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       ) : (
         <Sectors drivers={drivers} stints={stints} official={qualifyingResult} segments={qualifyingSegments} />
       )}
-    </div>
-  )
-}
-
-// ---- Mini-sector strip ----
-
-function MiniSectors({
-  drivers,
-  stints,
-  official,
-  segments,
-}: {
-  drivers: DriverState[]
-  stints: StintRow[]
-  official: QualifyingClassification[] | null
-  segments: QualiSegment[] | null
-}) {
-  // Order strictly by the same classification the other tabs use (official when
-  // known, otherwise the provisional knockout), so the mini-sector list never
-  // diverges from the grid. The strips are looked up per driver.
-  const report = useMemo(
-    () => buildQualifying(drivers, stints, official, segments),
-    [drivers, stints, official, segments],
-  )
-  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers).map((r) => [r.driverNumber, r])), [drivers])
-  const fastest = report.rows.find((r) => r.bestLap != null)?.bestLap ?? null
-  const hasData = [...strips.values()].some((r) => r.s1.length || r.s2.length || r.s3.length)
-
-  return (
-    <div className="panel practice-panel q-mini">
-      <div className="qm-legend">
-        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> track best</span>
-        <span><i className="qm-key" style={{ background: 'var(--green)' }} /> personal best</span>
-        <span><i className="qm-key" style={{ background: '#ffce3a' }} /> down on best</span>
-        <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
-        <span className="qm-note">Mini-sector colours from the timing feed — where the lap was won, not split times.</span>
-      </div>
-
-      <div className="qm-scroll">
-        {report.rows.map((r) => {
-          const strip = strips.get(r.driverNumber)
-          const gap = r.bestLap != null && fastest != null ? r.bestLap - fastest : null
-          return (
-            <div key={r.driverNumber} className={`qm-row ${r.bestLap == null ? 'qm-empty' : ''}`}>
-              <span className="qm-pos">{r.bestLap != null ? r.position : '—'}</span>
-              <span className="qm-drv" style={{ color: r.colour }}>{r.acronym}</span>
-              <span className="qm-lap">{formatLapTime(r.bestLap)}</span>
-              <span className="qm-gap">{r.position === 1 || gap == null ? '' : formatDelta(gap)}</span>
-              <MiniSectorStrip s1={strip?.s1 ?? []} s2={strip?.s2 ?? []} s3={strip?.s3 ?? []} />
-            </div>
-          )
-        })}
-      </div>
-      {!hasData && <div className="practice-empty">No mini-sector data yet this session.</div>}
     </div>
   )
 }
@@ -138,6 +79,10 @@ function Knockout({
     () => buildQualifying(drivers, stints, official, segments),
     [drivers, stints, official, segments],
   )
+  // Mini-sector strip per driver, drawn from their best lap — shown inline with
+  // the timing so the knockout table doubles as the where-on-track read
+  // (previously a separate Mini Sectors tab).
+  const strips = useMemo(() => new Map(buildMiniSectorRows(drivers).map((r) => [r.driverNumber, r])), [drivers])
   const hasLap = report.rows.some((r) => r.bestLap != null)
 
   // The two cars on each bubble, for the banner battle lines.
@@ -167,7 +112,16 @@ function Knockout({
         </div>
         <div className="pb-item">
           <span className="pb-k">Theoretical pole</span>
-          <span className="pb-v sb">{formatLapTime(report.theoreticalBest)}</span>
+          <span className="pb-v sb">
+            {report.theoreticalBest ? (
+              <>
+                {formatLapTime(report.theoreticalBest.time)}{' '}
+                <span style={{ color: report.theoreticalBest.colour }}>({report.theoreticalBest.acronym})</span>
+              </>
+            ) : (
+              '—'
+            )}
+          </span>
         </div>
         {report.eliminatedPerSegment > 0 && (
           <>
@@ -183,6 +137,14 @@ function Knockout({
         </div>
       </div>
 
+      <div className="qm-legend">
+        <span><i className="qm-key" style={{ background: 'var(--purple)' }} /> track best</span>
+        <span><i className="qm-key" style={{ background: 'var(--green)' }} /> personal best</span>
+        <span><i className="qm-key" style={{ background: '#ffce3a' }} /> down on best</span>
+        <span><i className="qm-key" style={{ background: 'rgba(255,255,255,0.08)' }} /> no time</span>
+        <span className="qm-note">Mini-sectors from the timing feed on each driver's best lap — where the lap was won, not split times.</span>
+      </div>
+
       <div className="ts-scroll">
         <table className="ts-table q-table">
           <thead>
@@ -196,6 +158,7 @@ function Knockout({
               <th className="ts-num">To line</th>
               <th className="ts-num" title="Theoretical best — sum of this driver's own best sectors">Theo</th>
               <th className="ts-num">Trap</th>
+              <th className="ts-mini">Mini-sectors</th>
             </tr>
           </thead>
           <tbody>
@@ -209,7 +172,7 @@ function Knockout({
                 <Fragment key={r.driverNumber}>
                   {showDivider && (
                     <tr className={`q-divider q-divider-${r.zone}`}>
-                      <td colSpan={9}>{ZONE_LABEL[r.zone]}</td>
+                      <td colSpan={10}>{ZONE_LABEL[r.zone]}</td>
                     </tr>
                   )}
                   <tr
@@ -237,6 +200,12 @@ function Knockout({
                       {formatLapTime(r.idealLap)}
                     </td>
                     <td className="ts-num dim">{r.speedTrap == null ? '—' : `${Math.round(r.speedTrap)}`}</td>
+                    <td className="ts-mini">
+                      {(() => {
+                        const s = strips.get(r.driverNumber)
+                        return <MiniSectorStrip s1={s?.s1 ?? []} s2={s?.s2 ?? []} s3={s?.s3 ?? []} />
+                      })()}
+                    </td>
                   </tr>
                 </Fragment>
               )
@@ -334,8 +303,14 @@ function Sectors({
           ))}
           <div className="q-king q-king-ideal">
             <span className="q-king-tag">Theoretical pole</span>
-            <span className="q-king-time sb">{formatLapTime(report.theoreticalBest)}</span>
-            <span className="q-king-drv dim">sum of best sectors</span>
+            <span className="q-king-time sb">{formatLapTime(report.theoreticalBest?.time ?? null)}</span>
+            <span
+              className="q-king-drv"
+              style={{ color: report.theoreticalBest?.colour }}
+              title="Fastest driver's own best sectors strung together"
+            >
+              {report.theoreticalBest ? report.theoreticalBest.acronym : '—'}
+            </span>
           </div>
         </div>
       </div>
