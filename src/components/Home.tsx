@@ -291,7 +291,7 @@ export function Home({ config, onEnterLive, onReplay }: Props) {
         <div className="home-brand">
           <CardiogramMark size={32} className="home-mark" />
           <div className="home-brand-text">
-            <span className="home-wordmark">Cardiogram</span>
+            <span className="home-wordmark"><span className="home-wordmark-car">car</span>diogram</span>
             <span className="home-tagline">Real-time Formula One telemetry, visualization, and analysis</span>
           </div>
         </div>
