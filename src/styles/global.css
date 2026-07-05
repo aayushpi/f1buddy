@@ -1932,6 +1932,7 @@ button {
 .home-mark { color: var(--accent); filter: drop-shadow(0 0 8px var(--accent-glow)); flex: 0 0 auto; }
 .home-brand-text { display: flex; flex-direction: column; gap: 3px; }
 .home-wordmark { font-size: clamp(18px, 2vw, 22px); font-weight: 800; letter-spacing: -0.01em; color: var(--text); line-height: 1; }
+.home-wordmark-car { color: var(--accent); }
 .home-tagline { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase; color: var(--muted); }
 
 /* Status pill (top-right) */

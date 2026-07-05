@@ -53,8 +53,8 @@ interface Link {
   moved: boolean
 }
 
-function GapCell({ value, label }: { value: number | null; label?: string }) {
-  const clear = value != null && value >= CLEAR_AIR
+function GapCell({ value, label, air = true }: { value: number | null; label?: string; air?: boolean }) {
+  const clear = air && value != null && value >= CLEAR_AIR
   return (
     <div className={`ps-gap mono ${clear ? 'clear-air' : ''}`}>
       <span className="ps-gap-val">{label ?? gapText(value)}</span>
@@ -338,7 +338,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
                       <TyreStrip compounds={tyresByDriver.get(d.driverNumber) ?? []} stops={d.pitStops} />
                     </div>
                     <GapCell value={d.isLeader ? null : interval} label={d.isLeader ? '—' : undefined} />
-                    <GapCell value={d.isLeader ? null : leader} label={d.isLeader ? 'LEADER' : undefined} />
+                    <GapCell value={d.isLeader ? null : leader} label={d.isLeader ? 'LEADER' : undefined} air={false} />
                     <div className="ps-actions">
                       {(['green', 'vsc', 'sc'] as PitType[]).map((t) => (
                         <button
@@ -418,7 +418,7 @@ export function PitSimulator({ drivers, stints, pitLoss, circuit }: Props) {
                       )}
                     </div>
                     <GapCell value={r.interval} label={r.leaderGap == null && r.interval == null ? '—' : undefined} />
-                    <GapCell value={r.leaderGap} label={r.leaderGap == null ? 'LEADER' : undefined} />
+                    <GapCell value={r.leaderGap} label={r.leaderGap == null ? 'LEADER' : undefined} air={false} />
                     <div className={`ps-move ${moved ? (r.delta! > 0 ? 'up' : 'down') : ''}`}>
                       {moved ? `${r.delta! > 0 ? '▲' : '▼'}${Math.abs(r.delta!)}` : '—'}
                     </div>
